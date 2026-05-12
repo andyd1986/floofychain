@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Floofy Core
+Comment=Connect to the Floofy P2P Network
+Comment[de]=Verbinde mit dem Floofy peer-to-peer Netzwerk
+Comment[fr]=Floofy, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=Floofy, eşten eşe kriptografik sanal para birimi
+Exec=floofy-qt %u
+Terminal=false
+Type=Application
+Icon=floofy128
+MimeType=x-scheme-handler/floofy;
+Categories=Office;Finance;

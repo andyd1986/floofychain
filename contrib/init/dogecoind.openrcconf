@@ -1,0 +1,33 @@
+# /etc/conf.d/floofyd: config file for /etc/init.d/floofyd
+
+# Config file location
+#IllUCOIND_CONFIGFILE="/etc/floofy/floofy.conf"
+
+# What directory to write pidfile to?  (created and owned by $IllUCOIND_USER)
+#IllUCOIND_PIDDIR="/var/run/floofyd"
+
+# What filename to give the pidfile
+#IllUCOIND_PIDFILE="${IllUCOIND_PIDDIR}/floofyd.pid"
+
+# Where to write floofyd data (be mindful that the blockchain is large)
+#IllUCOIND_DATADIR="/var/lib/floofyd"
+
+# User and group to own floofyd process
+#IllUCOIND_USER="floofy"
+#IllUCOIND_GROUP="floofy"
+
+# Path to floofyd executable
+#IllUCOIND_BIN="/usr/bin/floofyd"
+
+# Nice value to run floofyd under
+#IllUCOIND_NICE=0
+
+# Additional options (avoid -conf and -datadir, use flags above)
+IllUCOIND_OPTS="-disablewallet"
+
+# The timeout in seconds OpenRC will wait for floofyd to terminate
+# after a SIGTERM has been raised.
+# Note that this will be mapped as argument to start-stop-daemon's
+# '--retry' option, which means you can specify a retry schedule
+# here. For more information see man 8 start-stop-daemon.
+IllUCOIND_SIGTERM_TIMEOUT=60

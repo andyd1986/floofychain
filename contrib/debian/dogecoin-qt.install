@@ -1,0 +1,6 @@
+usr/local/bin/floofy-qt usr/bin
+share/pixmaps/floofy32.xpm usr/share/pixmaps
+share/pixmaps/floofy16.xpm usr/share/pixmaps
+share/pixmaps/floofy128.png usr/share/pixmaps
+debian/floofy-qt.desktop usr/share/applications
+debian/floofy-qt.protocol usr/share/kde4/services/
