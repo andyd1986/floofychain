@@ -98,7 +98,7 @@ CAuxPow::check(const uint256& hashAuxBlock, int nChainId,
      */
     if (params.fAuxpowLegacyRule && nChainId == 666)
     {
-        LogPrintf("CAuxPow::check: Allowing historical AuxPoW for chain ID 666\n");
+        //LogPrintf("CAuxPow::check: Allowing historical AuxPoW for chain ID 666\n");
         return true;
     }
     if (params.fStrictChainId && parentBlock.GetChainId () == nChainId)
