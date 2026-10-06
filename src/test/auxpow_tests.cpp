@@ -451,5 +451,469 @@ BOOST_AUTO_TEST_CASE(auxpow_pow)
 }
 
 /* ************************************************************************** */
+/* ************************************************************************** */
 
+/**
+ * Test the mainnet AuxPoW consensus transition at block 500000.
+ *
+ * This test deliberately does NOT perform mainnet Proof-of-Work mining.
+ * Proof-of-Work validation is already covered by auxpow_pow using regtest.
+ *
+ * This test is specifically responsible for checking:
+ *
+ *   1. Mainnet consensus selection at heights:
+ *
+ *          499999 -> historical AuxPoW rule
+ *          500000 -> new strict AuxPoW rule
+ *          500001 -> new strict AuxPoW rule
+ *
+ *   2. Historical malformed chain-ID-666 AuxPoW:
+ *
+ *          499999 -> accepted
+ *          500000 -> rejected
+ *          500001 -> rejected
+ *
+ *   3. Correctly constructed chain-ID-666 AuxPoW:
+ *
+ *          499999 -> accepted
+ *          500000 -> accepted
+ *          500001 -> accepted
+ *
+ *   4. Tampered AuxPoW:
+ *
+ *          499999 -> accepted by historical compatibility rule
+ *          500000 -> rejected by strict validation
+ *          500001 -> rejected by strict validation
+ */
+BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
+{
+    /*
+     * Use the real Floofy mainnet consensus parameters.
+     */
+    SelectParams(CBaseChainParams::MAIN);
+
+    /*
+     * Obtain the actual consensus parameters selected by the consensus
+     * tree immediately before, exactly at, and immediately after the
+     * activation height.
+     */
+    const Consensus::Params& params499999 =
+        Params().GetConsensus(499999);
+
+    const Consensus::Params& params500000 =
+        Params().GetConsensus(500000);
+
+    const Consensus::Params& params500001 =
+        Params().GetConsensus(500001);
+
+    /*
+     * ================================================================
+     * PART 1
+     *
+     * Verify that the correct mainnet chain ID is active at all three
+     * heights.
+     * ================================================================
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Checking mainnet AuxPoW chain ID around activation height"
+    );
+
+    BOOST_CHECK_EQUAL(
+        params499999.nAuxpowChainId,
+        666
+    );
+
+    BOOST_CHECK_EQUAL(
+        params500000.nAuxpowChainId,
+        666
+    );
+
+    BOOST_CHECK_EQUAL(
+        params500001.nAuxpowChainId,
+        666
+    );
+
+    /*
+     * ================================================================
+     * PART 2
+     *
+     * Verify the actual height-aware consensus transition.
+     *
+     * Block 499999 must still use the historical compatibility rule.
+     *
+     * Block 500000 is the first block using full AuxPoW validation.
+     *
+     * Block 500001 must continue using full AuxPoW validation.
+     * ================================================================
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Checking AuxPoW consensus rule at height 499999"
+    );
+
+    BOOST_CHECK(
+        params499999.fAuxpowLegacyRule
+    );
+
+    BOOST_TEST_MESSAGE(
+        "Checking AuxPoW consensus rule at height 500000"
+    );
+
+    BOOST_CHECK(
+        !params500000.fAuxpowLegacyRule
+    );
+
+    BOOST_TEST_MESSAGE(
+        "Checking AuxPoW consensus rule at height 500001"
+    );
+
+    BOOST_CHECK(
+        !params500001.fAuxpowLegacyRule
+    );
+
+    /*
+     * All three consensus parameter sets must still be configured for
+     * strict chain-ID checking.
+     */
+    BOOST_CHECK(
+        params499999.fStrictChainId
+    );
+
+    BOOST_CHECK(
+        params500000.fStrictChainId
+    );
+
+    BOOST_CHECK(
+        params500001.fStrictChainId
+    );
+
+    /*
+     * ================================================================
+     * PART 3
+     *
+     * Build a deliberately malformed historical AuxPoW.
+     *
+     * This simulates the type of AuxPoW that the historical chain-ID-666
+     * compatibility rule allowed.
+     *
+     * There is a parent coinbase transaction so CAuxPow is structurally
+     * usable, but the coinbase DOES NOT contain a valid merged-mining
+     * commitment for hashAux.
+     *
+     * Therefore:
+     *
+     *   old rule -> returns true because chain ID 666 is grandfathered
+     *
+     *   new rule -> continues into normal CAuxPow validation and fails
+     * ================================================================
+     */
+
+    const int32_t ourChainId = 666;
+
+    const uint256 hashAux =
+        ArithToUint256(
+            arith_uint256(123456789)
+        );
+
+    CAuxpowBuilder legacyBuilder(5, 42);
+
+    /*
+     * Construct a perfectly usable parent coinbase, but deliberately
+     * omit the merged-mining header/root/tree-size/nonce commitment.
+     */
+    CScript legacyScript;
+
+    legacyScript
+        << 2809
+        << 2013
+        << OP_2;
+
+    legacyBuilder.setCoinbase(
+        legacyScript
+    );
+
+    const CAuxPow legacyAuxpow =
+        legacyBuilder.get();
+
+    /*
+     * ------------------------------------------------
+     * Height 499999
+     *
+     * Historical compatibility rule is active.
+     *
+     * The malformed AuxPoW must therefore be accepted.
+     * ------------------------------------------------
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Legacy malformed AuxPoW at height 499999 should PASS"
+    );
+
+    BOOST_CHECK(
+        legacyAuxpow.check(
+            hashAux,
+            ourChainId,
+            params499999
+        )
+    );
+
+    /*
+     * ------------------------------------------------
+     * Height 500000
+     *
+     * Historical compatibility rule has been disabled.
+     *
+     * Full CAuxPow validation must detect that the parent coinbase does
+     * not contain a valid merged-mining commitment.
+     * ------------------------------------------------
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Legacy malformed AuxPoW at height 500000 should FAIL"
+    );
+
+    BOOST_CHECK(
+        !legacyAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500000
+        )
+    );
+
+    /*
+     * ------------------------------------------------
+     * Height 500001
+     *
+     * Full validation must remain active.
+     * ------------------------------------------------
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Legacy malformed AuxPoW at height 500001 should FAIL"
+    );
+
+    BOOST_CHECK(
+        !legacyAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500001
+        )
+    );
+
+    /*
+     * ================================================================
+     * PART 4
+     *
+     * Construct a completely valid AuxPoW commitment.
+     *
+     * Unlike the previous object, this parent coinbase contains:
+     *
+     *     merged-mining header
+     *     AuxPoW chain merkle root
+     *     tree size
+     *     nonce
+     *
+     * and uses the correct expected chain-merkle index.
+     * ================================================================
+     */
+
+    CAuxpowBuilder validBuilder(5, 42);
+
+    const unsigned merkleHeight = 3;
+
+    const int nonce = 7;
+
+    const int index =
+        CAuxPow::getExpectedIndex(
+            nonce,
+            ourChainId,
+            merkleHeight
+        );
+
+    /*
+     * Build the AuxPoW chain merkle branch from the child block hash.
+     */
+    const std::vector<unsigned char> auxRoot =
+        validBuilder.buildAuxpowChain(
+            hashAux,
+            merkleHeight,
+            index
+        );
+
+    /*
+     * Build the actual merged-mining commitment.
+     */
+    const std::vector<unsigned char> coinbaseData =
+        CAuxpowBuilder::buildCoinbaseData(
+            true,
+            auxRoot,
+            merkleHeight,
+            nonce
+        );
+
+    /*
+     * Put the merged-mining commitment into the parent coinbase.
+     */
+    CScript validScript;
+
+    validScript =
+        (CScript()
+            << 2809
+            << 2013)
+        + COINBASE_FLAGS;
+
+    validScript =
+        validScript
+        << OP_2
+        << coinbaseData;
+
+    validBuilder.setCoinbase(
+        validScript
+    );
+
+    const CAuxPow validAuxpow =
+        validBuilder.get();
+
+    /*
+     * ================================================================
+     * PART 5
+     *
+     * The correctly constructed AuxPoW must work both before and after
+     * activation.
+     * ================================================================
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Fully valid AuxPoW at height 499999 should PASS"
+    );
+
+    BOOST_CHECK(
+        validAuxpow.check(
+            hashAux,
+            ourChainId,
+            params499999
+        )
+    );
+
+    BOOST_TEST_MESSAGE(
+        "Fully valid AuxPoW at height 500000 should PASS"
+    );
+
+    BOOST_CHECK(
+        validAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500000
+        )
+    );
+
+    BOOST_TEST_MESSAGE(
+        "Fully valid AuxPoW at height 500001 should PASS"
+    );
+
+    BOOST_CHECK(
+        validAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500001
+        )
+    );
+
+    /*
+     * ================================================================
+     * PART 6
+     *
+     * Deliberately corrupt the chain-merkle index.
+     *
+     * This proves that full validation after activation is genuinely
+     * checking the AuxPoW structure.
+     * ================================================================
+     */
+
+    CAuxPow badIndexAuxpow =
+        validAuxpow;
+
+    badIndexAuxpow.nChainIndex++;
+
+    /*
+     * Historical behaviour at 499999 should still bypass this error.
+     */
+    BOOST_TEST_MESSAGE(
+        "Tampered chain index at height 499999 should PASS under legacy rule"
+    );
+
+    BOOST_CHECK(
+        badIndexAuxpow.check(
+            hashAux,
+            ourChainId,
+            params499999
+        )
+    );
+
+    /*
+     * At the activation block this corruption must be rejected.
+     */
+    BOOST_TEST_MESSAGE(
+        "Tampered chain index at height 500000 should FAIL"
+    );
+
+    BOOST_CHECK(
+        !badIndexAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500000
+        )
+    );
+
+    /*
+     * And it must continue to be rejected after activation.
+     */
+    BOOST_TEST_MESSAGE(
+        "Tampered chain index at height 500001 should FAIL"
+    );
+
+    BOOST_CHECK(
+        !badIndexAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500001
+        )
+    );
+
+    /*
+     * ================================================================
+     * PART 7
+     *
+     * Restore the correct AuxPoW and prove that the rejection above was
+     * specifically caused by the corrupted chain index.
+     * ================================================================
+     */
+
+    BOOST_TEST_MESSAGE(
+        "Restored valid AuxPoW at height 500000 should PASS"
+    );
+
+    BOOST_CHECK(
+        validAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500000
+        )
+    );
+
+    BOOST_TEST_MESSAGE(
+        "Restored valid AuxPoW at height 500001 should PASS"
+    );
+
+    BOOST_CHECK(
+        validAuxpow.check(
+            hashAux,
+            ourChainId,
+            params500001
+        )
+    );
+}
+
+/* ************************************************************************** */
 BOOST_AUTO_TEST_SUITE_END()

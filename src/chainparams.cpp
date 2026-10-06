@@ -73,6 +73,7 @@ class CMainParams : public CChainParams
 private:
     Consensus::Params digishieldConsensus;
     Consensus::Params auxpowConsensus;
+    Consensus::Params newAuxpowConsensus;
 
 public:
     CMainParams()
@@ -113,16 +114,24 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = 0;            // Disabled
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000013329dda1bc87");
+        consensus.nMinimumChainWork = uint256S("00000000000000000000000000000000000000000000000003b2387181ac2e0b");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x8940b6c598bf6bc0be3408061406033254e8db62dc4afef8cdbb269a242c0d21");
+        consensus.defaultAssumeValid = uint256S("cddb1930e0737f95dc7d74e9901b9302c7a8dbd6c6510ba2b41b2ced238a73ad");
 
-        // AuxPoW parameters
-        consensus.nAuxpowChainId = 0x029A; // 666 - Josh Wise!
-        consensus.fStrictChainId = true;
-        consensus.fAllowLegacyBlocks = true;
-        consensus.nHeightEffective = 0;
+	// AuxPoW parameters
+	consensus.nAuxpowChainId = 0x029A; // 666 - Josh Wise!
+	consensus.fStrictChainId = true;
+	consensus.fAllowLegacyBlocks = true;
+
+	/*
+ 	* Historical AuxPoW rule.
+ 	*
+ 	* Blocks before the activation height retain the old Floofy
+ 	* chain-666 compatibility behaviour.
+ 	*/
+	consensus.fAuxpowLegacyRule = true;
+	consensus.nHeightEffective = 0;
 
         // Blocks 145000 - 371336 are Digishield without AuxPoW
         digishieldConsensus = consensus;
@@ -132,15 +141,42 @@ public:
         digishieldConsensus.nPowTargetTimespan = 60; // post-digishield: 1 minute
         digishieldConsensus.nCoinbaseMaturity = 10;
 
-        // Blocks 371337+ are AuxPoW
-        auxpowConsensus = digishieldConsensus;
-        auxpowConsensus.nHeightEffective = 0;
-        auxpowConsensus.fAllowLegacyBlocks = false;
+	// Blocks 371337+ are AuxPoW
+	auxpowConsensus = digishieldConsensus;
+	auxpowConsensus.nHeightEffective = 0;
+	auxpowConsensus.fAllowLegacyBlocks = false;
 
-        // Assemble the binary search tree of consensus parameters
-        pConsensusRoot = &digishieldConsensus;
-        digishieldConsensus.pLeft = &consensus;
-        digishieldConsensus.pRight = &auxpowConsensus;
+	/*
+ 	* Historical AuxPoW validation remains enabled until the activation
+ 	* height.  This preserves consensus for all existing mainnet blocks.
+ 	*/
+	auxpowConsensus.fAuxpowLegacyRule = true;
+
+	/*
+ 	* New AuxPoW consensus rules.
+	*
+ 	* Starting at block 500000, the historical chain-666 shortcut is
+ 	* disabled and normal AuxPoW validation is enforced.
+ 	*/
+	newAuxpowConsensus = auxpowConsensus;
+	newAuxpowConsensus.nHeightEffective = 250000;
+	newAuxpowConsensus.fAuxpowLegacyRule = false;
+
+	/*
+	* Assemble the binary search tree of consensus parameters.
+ 	*
+ 	* digishieldConsensus
+ 	*       |
+ 	*       +---- consensus
+ 	*       |
+ 	*       +---- auxpowConsensus
+ 	*                    |
+ 	*                    +---- newAuxpowConsensus
+ 	*/
+	pConsensusRoot = &digishieldConsensus;
+	digishieldConsensus.pLeft = &consensus;
+	digishieldConsensus.pRight = &auxpowConsensus;
+	auxpowConsensus.pRight = &newAuxpowConsensus;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -159,6 +195,7 @@ public:
         consensus.hashGenesisBlock = genesis.GetHash();
         digishieldConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         auxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+	newAuxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         assert(consensus.hashGenesisBlock == uint256S("0xd4c3cabcae34cbf79a2f5198806e16d5176c097973c6b0305ddd8b9e9d139ad0"));
         assert(genesis.hashMerkleRoot == uint256S("0xfb302a48e0870d4f80943e4ced86db117f623993fcd1de6b7f59893cf2684124"));
 
@@ -184,11 +221,15 @@ public:
                 (0, uint256S("0xd4c3cabcae34cbf79a2f5198806e16d5176c097973c6b0305ddd8b9e9d139ad0"))
                 (5000, uint256S("0x9e9f21aac529eb68ab8ae8819d83b323dcd2576941017e38646def81f79184df"))
                 (10000, uint256S("0x0cbe3bf298c7b3e2e88af038b2dfc6e356089b5e52efbf599a61de0916ab7f9e"))
-                (15000, uint256S("0x8940b6c598bf6bc0be3408061406033254e8db62dc4afef8cdbb269a242c0d21"))};
+                (15000, uint256S("0x8940b6c598bf6bc0be3408061406033254e8db62dc4afef8cdbb269a242c0d21"))
+        	(50000, uint256S("11b1bae732bc9439159e756791cb060c4b18d2a03c784ed7f68bfd788925b0c0"))
+	        (100000, uint256S("87e9cdbb5a2268adca90057a2af74635ad806c8ce381db91db253096a1340e1f")) // Block at height 100000
+	        (150000, uint256S("9f7411c63836526a923985b9136a45c2ce1fcfae275994569bfaebbb17bb2333")) // Block at height 150000
+	        (200000, uint256S("cddb1930e0737f95dc7d74e9901b9302c7a8dbd6c6510ba2b41b2ced238a73ad"))}; // Block at height 200000
 
         chainTxData = ChainTxData{
-            1777212524,
-            15922,
+            1790124769,
+            208437,
             2.0
         };
     }

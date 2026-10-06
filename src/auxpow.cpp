@@ -84,11 +84,23 @@ CAuxPow::check(const uint256& hashAuxBlock, int nChainId,
     if (nIndex != 0)
         return error("AuxPow is not a generate");
 
-    if (nChainId == 666)
-        {
-            LogPrintf("CAuxPow::check: Allowing AuxPoW for Genesis Block\n");
-            return true;
-        }
+    /*
+     * Historical Floofy AuxPoW compatibility rule.
+     *
+     * This was originally unconditional for chain ID 666.  It is now
+     * controlled by the height-aware consensus parameter so that the
+     * historical chain remains valid while new blocks are required to
+     * pass the complete AuxPoW validation below.
+     *
+     * IMPORTANT:
+     * Keep this explicitly tied to chain ID 666.  Testnet and regtest
+     * must never inherit this historical mainnet-only exception.
+     */
+    if (params.fAuxpowLegacyRule && nChainId == 666)
+    {
+        LogPrintf("CAuxPow::check: Allowing historical AuxPoW for chain ID 666\n");
+        return true;
+    }
     if (params.fStrictChainId && parentBlock.GetChainId () == nChainId)
         return error("Aux POW parent has our chain ID");
 

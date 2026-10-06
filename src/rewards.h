@@ -20,6 +20,7 @@ CAmount GetFloofyBlockSubsidy(int nHeight, const Consensus::Params& consensusPar
 #define REWARD_FORK_V4_HEIGHT 300000
 #define REWARD_FORK_V5_HEIGHT 400000
 #define REWARD_FORK_V6_HEIGHT 500000
+#define REWARD_FORK_V7_HEIGHT 600000
 
 // ================================
 // V1 - High Rewards: 500 to 10,000 (1000 values)
@@ -417,7 +418,7 @@ static const std::vector<CAmount> rewardTableV5 = {
 };
 
 // ================================
-// V6 - Final Rewards: 1 to 50
+// V6 -  1 to 50
 // ================================
 
 static const std::vector<CAmount> rewardTableV6 = {
@@ -427,12 +428,31 @@ static const std::vector<CAmount> rewardTableV6 = {
     31 * COIN, 32 * COIN, 33 * COIN, 34 * COIN, 35 * COIN, 36 * COIN, 37 * COIN, 38 * COIN, 39 * COIN, 40 * COIN,
     41 * COIN, 42 * COIN, 43 * COIN, 44 * COIN, 45 * COIN, 46 * COIN, 47 * COIN, 48 * COIN, 49 * COIN, 50 * COIN
 };
+
+//================================
+
+// V7 - Final Rewards 10 to 1000
+
+//================================
+
+static const std::vector<CAmount> rewardTableV7 = {
+    10 * COIN, 51 * COIN, 92 * COIN, 134 * COIN, 175 * COIN, 216 * COIN, 
+    258 * COIN, 299 * COIN, 340 * COIN, 381 * COIN, 422 * COIN, 464 * COIN, 
+    505 * COIN, 546 * COIN, 588 * COIN, 629 * COIN, 670 * COIN, 711 * COIN, 
+    752 * COIN, 794 * COIN, 835 * COIN, 876 * COIN, 918 * COIN, 959 * COIN, 
+    1000 * COIN
+};
+
+
 // ================================
 // Table Selector Function
 // ================================
 
-inline const std::vector<CAmount>& GetRewardTable(int height) {
-    if (height >= REWARD_FORK_V6_HEIGHT) {
+inline const std::vector<CAmount>& GetRewardTable(int height)
+{
+    if (height >= REWARD_FORK_V7_HEIGHT) {
+        return rewardTableV7;
+    } else if (height >= REWARD_FORK_V6_HEIGHT) {
         return rewardTableV6;
     } else if (height >= REWARD_FORK_V5_HEIGHT) {
         return rewardTableV5;
@@ -443,6 +463,7 @@ inline const std::vector<CAmount>& GetRewardTable(int height) {
     } else if (height >= REWARD_FORK_V2_HEIGHT) {
         return rewardTableV2;
     }
+
     return rewardTableV1;
 }
 

@@ -80,6 +80,14 @@ struct Params {
     bool fStrictChainId;
     bool fAllowLegacyBlocks;
 
+    /**
+     * Historical AuxPoW validation rule.
+     *
+     * When true, the historical chain-666 AuxPoW compatibility rule
+     * is enabled. When false, normal AuxPoW validation is enforced.
+     */
+    bool fAuxpowLegacyRule;
+
     /** Height-aware consensus parameters */
     uint32_t nHeightEffective; // When these parameters come into use
     struct Params *pLeft = nullptr;      // Left hand branch

@@ -373,10 +373,10 @@
 /* #undef QT_QPA_PLATFORM_WINDOWS */
 
 /* Define this symbol if the qt platform is xcb */
-#define QT_QPA_PLATFORM_XCB 1
+/* #undef QT_QPA_PLATFORM_XCB */
 
 /* Define this symbol if qt plugins are static */
-#define QT_STATICPLUGIN 1
+/* #undef QT_STATICPLUGIN */
 
 /* Define to 1 if all of the C90 standard headers exist (not just the ones
    required in a freestanding environment). This macro is provided for
@@ -396,10 +396,10 @@
 /* #undef USE_AVX2 */
 
 /* Define if dbus support should be compiled in */
-#define USE_DBUS 1
+/* #undef USE_DBUS */
 
 /* Define if QR support should be compiled in */
-#define USE_QRCODE 1
+/* #undef USE_QRCODE */
 
 /* Define this symbol if SSE2 works */
 /* #undef USE_SSE2 */
