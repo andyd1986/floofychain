@@ -155,7 +155,7 @@ public:
 	/*
  	* New AuxPoW consensus rules.
 	*
- 	* Starting at block 500000, the historical chain-666 shortcut is
+ 	* Starting at block 250000, the historical chain-666 shortcut is
  	* disabled and normal AuxPoW validation is enforced.
  	*/
 	newAuxpowConsensus = auxpowConsensus;
@@ -187,7 +187,7 @@ public:
         pchMessageStart[1] = 0xf1;
         pchMessageStart[2] = 0xc7;
         pchMessageStart[3] = 0x9e;
-        nDefaultPort = 66661;
+        nDefaultPort = 6661;
         nPruneAfterHeight = 100000;
 
         genesis = CreateGenesisBlock(1740415000, 24578800, 0x1e0ffff0, (1 | (1 << 8)) | (666 << 16), 88 * COIN);
@@ -326,7 +326,7 @@ public:
         pchMessageStart[1] = 0xf7;
         pchMessageStart[2] = 0xd9;
         pchMessageStart[3] = 0xbc;
-        nDefaultPort = 66663;
+        nDefaultPort = 6663;
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(1740415000, 9258121, 0x1e0ffff0, (1 | (1 << 8)) | (666 << 16), 88 * COIN);
