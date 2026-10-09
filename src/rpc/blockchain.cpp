@@ -6,6 +6,14 @@
 
 #include "rpc/blockchain.h"
 
+#include "burn.h"
+#include "base58.h"
+#include "script/standard.h"
+
+#include <algorithm>
+#include <mutex>
+#include <vector>
+
 #include "amount.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -24,6 +32,7 @@
 #include "undo.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "utilmoneystr.h"
 #include "hash.h"
 
 #include <stdint.h>
@@ -1854,6 +1863,578 @@ static UniValue getblockstats(const JSONRPCRequest& request)
     return ret;
 }
 
+
+
+/*
+ * FloofyChain Voluntary Burning System
+ *
+ * Supports:
+ * - Provably unspendable OP_RETURN burns
+ * - Legacy burn-address tracking
+ * - Blockchain-wide burned totals
+ * - Burn transaction history
+ * - Historical block scanning without repeating PoW checks
+ * - Progress logging every 10,000 blocks
+ * - Blockchain reorganisation protection
+ *
+ * This implementation does not change consensus rules.
+ *
+ * Network-wide totals require complete historical block data.
+ */
+
+static std::mutex floofyBurnScanMutex;
+
+// ============================================================
+// FLOOFYCHAIN BURN SCANNER
+// ============================================================
+
+static UniValue ScanFloofyBurns(
+    bool history,
+    const JSONRPCRequest& request)
+{
+    // Prevent multiple expensive scans running simultaneously.
+    std::unique_lock<std::mutex> scanLock(
+        floofyBurnScanMutex,
+        std::try_to_lock
+    );
+
+    if (!scanLock.owns_lock())
+    {
+        throw JSONRPCError(
+            RPC_MISC_ERROR,
+            "Another FloofyChain burn scan is running"
+        );
+    }
+
+    int tipHeight = -1;
+    int firstHeight = 0;
+    int lastHeight = 0;
+
+    uint256 snapshotTipHash;
+
+    std::vector<const CBlockIndex*> indexes;
+
+    // ========================================================
+    // TAKE SNAPSHOT OF ACTIVE BLOCKCHAIN
+    // ========================================================
+
+    {
+        LOCK(cs_main);
+
+        tipHeight = chainActive.Height();
+
+        if (tipHeight < 0)
+        {
+            throw JSONRPCError(
+                RPC_MISC_ERROR,
+                "No active blockchain"
+            );
+        }
+
+        if (history)
+        {
+            int blockCount = 100;
+
+            if (request.params.size() > 1 &&
+                !request.params[1].isNull())
+            {
+                blockCount = request.params[1].get_int();
+            }
+
+            if (blockCount < 1 || blockCount > 1000)
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER,
+                    "Block count must be between 1 and 1000"
+                );
+            }
+
+            firstHeight = std::max(
+                0,
+                tipHeight - blockCount + 1
+            );
+
+            if (request.params.size() > 0 &&
+                !request.params[0].isNull())
+            {
+                firstHeight = request.params[0].get_int();
+            }
+
+            if (firstHeight < 0 || firstHeight > tipHeight)
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER,
+                    "Invalid start height"
+                );
+            }
+
+            lastHeight = static_cast<int>(
+                std::min<int64_t>(
+                    tipHeight,
+                    static_cast<int64_t>(firstHeight) +
+                        blockCount - 1
+                )
+            );
+        }
+        else
+        {
+            // Scan entire blockchain for network-wide totals.
+            firstHeight = 0;
+            lastHeight = tipHeight;
+        }
+
+        snapshotTipHash =
+            chainActive[tipHeight]->GetBlockHash();
+
+        indexes.reserve(
+            lastHeight - firstHeight + 1
+        );
+
+        for (int h = firstHeight; h <= lastHeight; ++h)
+        {
+            indexes.push_back(chainActive[h]);
+        }
+    }
+
+    // ========================================================
+    // LEGACY BURN ADDRESS
+    // ========================================================
+
+    const CBitcoinAddress legacyAddress(
+        "F9116Y1RWWyHEgP4TC5e5vtcvhjdf1f6fg"
+    );
+
+    const bool trackLegacy = legacyAddress.IsValid();
+
+    const CScript legacyScript = trackLegacy
+        ? GetScriptForDestination(legacyAddress.Get())
+        : CScript();
+
+    // ========================================================
+    // STATISTICS
+    // ========================================================
+
+    CAmount provableTotal = 0;
+    CAmount legacyTotal = 0;
+
+    int64_t provableOutputs = 0;
+    int64_t legacyOutputs = 0;
+
+    int64_t provableTransactions = 0;
+    int64_t legacyTransactions = 0;
+
+    int lastBurnHeight = -1;
+
+    UniValue records(UniValue::VARR);
+
+    LogPrintf(
+        "Floofy Burn Scanner: Starting scan "
+        "from block %d to %d (%u blocks)\n",
+        firstHeight,
+        lastHeight,
+        (unsigned int)indexes.size()
+    );
+
+    // ========================================================
+    // SCAN BLOCKCHAIN
+    // ========================================================
+
+    for (size_t i = 0; i < indexes.size(); ++i)
+    {
+        const CBlockIndex* index = indexes[i];
+
+        const int height =
+            firstHeight + static_cast<int>(i);
+
+        CBlock block;
+
+        // ====================================================
+        // OPTIMISED BLOCK READING
+        //
+        // The fourth parameter disables repeated PoW/AuxPoW
+        // verification when reading already-validated blocks.
+        //
+        // The block hash is still checked against the index.
+        //
+        // Normal consensus validation is NOT affected.
+        // ====================================================
+
+        if (!ReadBlockFromDisk(
+                block,
+                index,
+                Params().GetConsensus(height),
+                false))
+        {
+            LogPrintf(
+                "Floofy Burn Scanner: Failed reading "
+                "block %d\n",
+                height
+            );
+
+            throw JSONRPCError(
+                RPC_MISC_ERROR,
+                strprintf(
+                    "Cannot read block %d. "
+                    "Complete historical block data "
+                    "may be unavailable.",
+                    height
+                )
+            );
+        }
+
+        // ====================================================
+        // SCAN TRANSACTIONS
+        // ====================================================
+
+        for (const auto& tx : block.vtx)
+        {
+            bool hasProvableBurn = false;
+            bool hasLegacyTransfer = false;
+
+            for (unsigned int vout = 0;
+                 vout < tx->vout.size();
+                 ++vout)
+            {
+                const CTxOut& output = tx->vout[vout];
+
+                // Ignore outputs without a positive value.
+                if (output.nValue <= 0)
+                    continue;
+
+                std::string message;
+
+                // Check for a recognised OP_RETURN burn.
+                const bool provable =
+                    ParseFloofyBurn(
+                        output,
+                        message
+                    );
+
+                // Check for historical transfers to the
+                // original FloofyChain burn address.
+                const bool legacy =
+                    trackLegacy &&
+                    output.scriptPubKey == legacyScript;
+
+                if (!provable && !legacy)
+                    continue;
+
+                // ============================================
+                // PROVABLY UNSPENDABLE BURN
+                // ============================================
+
+                if (provable)
+                {
+                    if (provableTotal >
+                        MAX_MONEY - output.nValue)
+                    {
+                        throw JSONRPCError(
+                            RPC_MISC_ERROR,
+                            "Provable burn total overflow"
+                        );
+                    }
+
+                    provableTotal += output.nValue;
+
+                    ++provableOutputs;
+
+                    hasProvableBurn = true;
+
+                    lastBurnHeight = height;
+                }
+
+                // ============================================
+                // LEGACY BURN ADDRESS
+                // ============================================
+
+                else if (legacy)
+                {
+                    if (legacyTotal >
+                        MAX_MONEY - output.nValue)
+                    {
+                        throw JSONRPCError(
+                            RPC_MISC_ERROR,
+                            "Legacy transfer total overflow"
+                        );
+                    }
+
+                    legacyTotal += output.nValue;
+
+                    ++legacyOutputs;
+
+                    hasLegacyTransfer = true;
+                }
+
+                // ============================================
+                // TRANSACTION HISTORY
+                // ============================================
+
+                if (history)
+                {
+                    UniValue row(UniValue::VOBJ);
+
+                    row.pushKV(
+                        "txid",
+                        tx->GetHash().GetHex()
+                    );
+
+                    row.pushKV(
+                        "vout",
+                        (int)vout
+                    );
+
+                    row.pushKV(
+                        "height",
+                        height
+                    );
+
+                    row.pushKV(
+                        "blockhash",
+                        index->GetBlockHash().GetHex()
+                    );
+
+                    row.pushKV(
+                        "confirmations",
+                        tipHeight - height + 1
+                    );
+
+                    row.pushKV(
+                        "time",
+                        index->GetBlockTime()
+                    );
+
+                    row.pushKV(
+                        "amount",
+                        ValueFromAmount(output.nValue)
+                    );
+
+                    row.pushKV(
+                        "method",
+                        provable
+                            ? "OP_RETURN"
+                            : "legacy_address"
+                    );
+
+                    row.pushKV(
+                        "provably_unspendable",
+                        provable
+                    );
+
+                    if (provable)
+                    {
+                        row.pushKV(
+                            "message",
+                            message
+                        );
+                    }
+
+                    records.push_back(row);
+                }
+            }
+
+            if (hasProvableBurn)
+            {
+                ++provableTransactions;
+            }
+
+            if (hasLegacyTransfer)
+            {
+                ++legacyTransactions;
+            }
+        }
+
+        // ====================================================
+        // PROGRESS LOGGING
+        //
+        // Log after processing blocks, rather than before.
+        // Output every 10,000 blocks and at completion.
+        // ====================================================
+
+        const size_t processed = i + 1;
+
+        if (processed % 10000 == 0 ||
+            processed == indexes.size())
+        {
+            LogPrintf(
+                "Floofy Burn Scanner: Processed "
+                "%u / %u blocks "
+                "(current height %d)\n",
+                (unsigned int)processed,
+                (unsigned int)indexes.size(),
+                height
+            );
+        }
+    }
+
+    // ========================================================
+    // BLOCKCHAIN REORGANISATION CHECK
+    // ========================================================
+
+    {
+        LOCK(cs_main);
+
+        if (chainActive.Height() < tipHeight ||
+            chainActive[tipHeight]->GetBlockHash() !=
+                snapshotTipHash)
+        {
+            LogPrintf(
+                "Floofy Burn Scanner: Chain changed "
+                "during scan. Results discarded.\n"
+            );
+
+            throw JSONRPCError(
+                RPC_MISC_ERROR,
+                "Blockchain reorganized during "
+                "burn scan. Please retry."
+            );
+        }
+    }
+
+    LogPrintf(
+        "Floofy Burn Scanner: Completed. "
+        "Provable burns: %s FLOOF, "
+        "Legacy transfers: %s FLOOF\n",
+        FormatMoney(provableTotal),
+        FormatMoney(legacyTotal)
+    );
+
+    // ========================================================
+    // RETURN TRANSACTION HISTORY
+    // ========================================================
+
+    if (history)
+    {
+        return records;
+    }
+
+    // ========================================================
+    // RETURN NETWORK-WIDE BURN STATISTICS
+    // ========================================================
+
+    UniValue result(UniValue::VOBJ);
+
+    result.pushKV(
+        "height",
+        tipHeight
+    );
+
+    result.pushKV(
+        "blockhash",
+        snapshotTipHash.GetHex()
+    );
+
+    result.pushKV(
+        "confirmed_burned",
+        ValueFromAmount(provableTotal)
+    );
+
+    result.pushKV(
+        "burn_transactions",
+        provableTransactions
+    );
+
+    result.pushKV(
+        "burn_outputs",
+        provableOutputs
+    );
+
+    result.pushKV(
+        "last_burn_height",
+        lastBurnHeight
+    );
+
+    result.pushKV(
+        "legacy_address_received",
+        ValueFromAmount(legacyTotal)
+    );
+
+    result.pushKV(
+        "legacy_transactions",
+        legacyTransactions
+    );
+
+    result.pushKV(
+        "legacy_outputs",
+        legacyOutputs
+    );
+
+    result.pushKV(
+        "legacy_provably_unspendable",
+        false
+    );
+
+    result.pushKV(
+        "historical_scan_complete",
+        true
+    );
+
+    LogPrintf(
+        "Floofy Burn Scanner: Returning statistics\n"
+    );
+
+    return result;
+}
+
+// ============================================================
+// RPC: GET BURNED TOTAL
+// ============================================================
+
+static UniValue getburnedtotal(
+    const JSONRPCRequest& request)
+{
+    if (request.fHelp || !request.params.empty())
+    {
+        throw std::runtime_error(
+            "getburnedtotal\n"
+            "\nReturns blockchain-wide confirmed "
+            "FLOOF burn statistics.\n"
+            "\nIncludes:\n"
+            "- Provably unspendable OP_RETURN burns\n"
+            "- Legacy burn-address transfers\n"
+            "- Burn transaction counts\n"
+            "- Last recorded burn height\n"
+            "\nRequires complete historical block data.\n"
+            "\nPerforms a fresh blockchain scan.\n"
+        );
+    }
+
+    return ScanFloofyBurns(false, request);
+}
+
+// ============================================================
+// RPC: LIST BURN TRANSACTIONS
+// ============================================================
+
+static UniValue listburntransactions(
+    const JSONRPCRequest& request)
+{
+    if (request.fHelp ||
+        request.params.size() > 2)
+    {
+        throw std::runtime_error(
+            "listburntransactions "
+            "(start_height) (block_count)\n"
+            "\nLists confirmed FloofyChain "
+            "burn transactions.\n"
+            "\nIncludes:\n"
+            "- Transaction ID\n"
+            "- Block height and hash\n"
+            "- Confirmations\n"
+            "- Burn amount\n"
+            "- Burn method\n"
+            "- Optional burn message\n"
+            "\nArguments:\n"
+            "1. start_height (numeric, optional)\n"
+            "2. block_count (numeric, default=100, max=1000)\n"
+            "\nBy default scans the latest 100 blocks.\n"
+        );
+    }
+
+    return ScanFloofyBurns(true, request);
+}
+
+
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ ----------
@@ -1877,6 +2458,8 @@ static const CRPCCommand commands[] =
     { "blockchain",         "verifychain",            &verifychain,            true,  {"checklevel","nblocks"} },
 
     { "blockchain",         "preciousblock",          &preciousblock,          true,  {"blockhash"} },
+    { "blockchain",         "getburnedtotal",         &getburnedtotal,         true,  {} },
+    { "blockchain",         "listburntransactions",   &listburntransactions,   true,  {"start_height", "block_count"} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        true,  {"blockhash"} },

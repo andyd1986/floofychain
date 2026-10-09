@@ -23,6 +23,7 @@
 #include "wallet.h"
 #include "wallet/rpcutil.h"
 #include "walletdb.h"
+#include "burn.h"
 
 #include <script/standard.h>
 
@@ -100,43 +101,6 @@ void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
     BOOST_FOREACH(const PAIRTYPE(string,string)& item, wtx.mapValue)
         entry.pushKV(item.first, item.second);
 }
-
-static UniValue getburnedtotal(const JSONRPCRequest& request)
-{
-    if (request.fHelp || !request.params.empty())
-        throw std::runtime_error(
-            "getburnedtotal\n"
-            "\nReturns the total amount of FLOOF burned to the known burn script (Hash160 based).\n"
-        );
-
-    CWallet* const wallet = pwalletMain;
-    if (!wallet)
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet not loaded");
-
-    LOCK(wallet->cs_wallet);
-
-    const std::string burnAddr = "F9116Y1RWWyHEgP4TC5e5vtcvhjdf1f6fg";
-    CBitcoinAddress address(burnAddr);
-    if (!address.IsValid())
-    throw std::runtime_error("Invalid burn address");
-
-    CScript expectedBurnScript = GetScriptForDestination(address.Get());
-
-    CAmount totalBurned = 0;
-
-    for (const std::pair<uint256, CWalletTx>& entry : wallet->mapWallet) {
-        const CWalletTx& tx = entry.second;
-
-        for (const CTxOut& out : tx.tx->vout) {
-            if (out.nValue > 0 && out.scriptPubKey == expectedBurnScript) {
-                totalBurned += out.nValue;
-            }
-        }
-    }
-
-    return ValueFromAmount(totalBurned);
-}
-
 
 
 
@@ -477,66 +441,207 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
     return wtx.GetHash().GetHex();
 }
 
+
 static UniValue burn(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 2)
+    if (request.fHelp ||
+        request.params.size() < 1 ||
+        request.params.size() > 4)
+    {
         throw std::runtime_error(
-            "burn amount (subtractfeefromamount)\n"
-            "\nSend coins to the burn address.\n"
+            "burn amount (subtractfeefromamount) "
+            "(message) (preview)\n"
+            "\nPermanently burn FLOOF using OP_RETURN.\n"
             "\nArguments:\n"
-            "1. amount                  (numeric, required) The amount to burn.\n"
-            "2. subtractfeefromamount   (boolean, optional, default=false)\n"
-            "\nResult:\n"
-            "\"txid\"                   (string) The transaction ID.\n"
+            "1. amount                   (numeric, required)\n"
+            "2. subtractfeefromamount    (boolean, default=false)\n"
+            "3. message                  (string, optional)\n"
+            "4. preview                  (boolean, default=false)\n"
+            "\nThe exact amount is burned. Fees are additional.\n"
+            "subtractfeefromamount=true is not supported.\n"
+            "Messages are limited to 48 printable ASCII bytes.\n"
         );
+    }
 
     if (!pwalletMain)
-        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet not loaded");
+        throw JSONRPCError(
+            RPC_WALLET_ERROR,
+            "Wallet not loaded"
+        );
+
+    const CAmount amount = AmountFromValue(
+        request.params[0]
+    );
+
+    if (amount <= 0)
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            "Burn amount must be greater than zero"
+        );
+
+    bool subtractFee = false;
+    std::string message;
+    bool preview = false;
+
+    if (request.params.size() > 1 &&
+        !request.params[1].isNull())
+    {
+        subtractFee = request.params[1].get_bool();
+    }
+
+    if (subtractFee)
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            "Cannot subtract fees from the burn amount"
+        );
+
+    if (request.params.size() > 2 &&
+        !request.params[2].isNull())
+    {
+        message = request.params[2].get_str();
+    }
+
+    if (!IsValidFloofyBurnMessage(message))
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            "Invalid burn message: maximum 48 printable ASCII bytes"
+        );
+
+    if (request.params.size() > 3 &&
+        !request.params[3].isNull())
+    {
+        preview = request.params[3].get_bool();
+    }
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
-    if (pwalletMain->IsLocked())
-        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Wallet locked, unlock it first.");
+    EnsureWalletIsUnlocked();
 
-    CAmount nAmount = AmountFromValue(request.params[0]);
-    if (nAmount <= 0)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Amount must be greater than zero");
+    // Build a provably unspendable output.
+    const CScript scriptPubKey =
+        FloofyBurnScript(message);
 
-    bool subtractFeeFromAmount = false;
-    if (request.params.size() > 1)
-        subtractFeeFromAmount = request.params[1].get_bool();
+    const CRecipient recipient = {
+        scriptPubKey,
+        amount,
+        false
+    };
 
-    const std::string burnAddr = "F9116Y1RWWyHEgP4TC5e5vtcvhjdf1f6fg";
-    CBitcoinAddress address(burnAddr);
-    if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Burn address is invalid");
+    std::vector<CRecipient> recipients;
+    recipients.push_back(recipient);
 
-    CScript scriptPubKey = GetScriptForDestination(address.Get());
+    CReserveKey reserveKey(pwalletMain);
+    CWalletTx walletTx;
 
-    CRecipient recipient = { scriptPubKey, nAmount, subtractFeeFromAmount };
-    std::vector<CRecipient> vecSend;
-    vecSend.push_back(recipient);
+    CAmount feeRequired = 0;
+    int changePosition = -1;
 
-    CReserveKey reservekey(pwalletMain);
-    CWalletTx wtx;
-    CAmount nFeeRequired;
-    int nChangePos = -1;
-    std::string strError;
-
+    std::string error;
     CCoinControl coinControl;
 
-    if (!pwalletMain->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePos, strError, &coinControl)) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed: " + strError);
+    if (!pwalletMain->CreateTransaction(
+            recipients,
+            walletTx,
+            reserveKey,
+            feeRequired,
+            changePosition,
+            error,
+            &coinControl))
+    {
+        throw JSONRPCError(
+            RPC_WALLET_ERROR,
+            "Burn transaction creation failed: " + error
+        );
+    }
+
+    // Verify the finished transaction before signing off.
+    CAmount actualBurn = 0;
+    int burnOutputs = 0;
+
+    for (const CTxOut& output : walletTx.tx->vout)
+    {
+        std::string decodedMessage;
+
+        if (ParseFloofyBurn(output, decodedMessage))
+        {
+            if (decodedMessage != message)
+                throw JSONRPCError(
+                    RPC_WALLET_ERROR,
+                    "Unexpected burn message in transaction"
+                );
+
+            actualBurn += output.nValue;
+            ++burnOutputs;
+        }
+    }
+
+    if (burnOutputs != 1 || actualBurn != amount)
+        throw JSONRPCError(
+            RPC_WALLET_ERROR,
+            "Burn transaction amount validation failed"
+        );
+
+    if (feeRequired < 0 ||
+        actualBurn > MAX_MONEY - feeRequired)
+        throw JSONRPCError(
+            RPC_WALLET_ERROR,
+            "Invalid transaction fee"
+        );
+
+    UniValue result(UniValue::VOBJ);
+
+    result.pushKV(
+        "amount",
+        ValueFromAmount(actualBurn)
+    );
+
+    result.pushKV(
+        "fee",
+        ValueFromAmount(feeRequired)
+    );
+
+    result.pushKV(
+        "wallet_cost",
+        ValueFromAmount(actualBurn + feeRequired)
+    );
+
+    result.pushKV("method", "OP_RETURN");
+    result.pushKV("message", message);
+
+    if (preview)
+    {
+        result.pushKV("preview", true);
+        result.pushKV("committed", false);
+
+        return result;
     }
 
     CValidationState state;
-if (!pwalletMain->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
-    throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed: " + FormatStateMessage(state));
+
+    if (!pwalletMain->CommitTransaction(
+            walletTx,
+            reserveKey,
+            g_connman.get(),
+            state))
+    {
+        throw JSONRPCError(
+            RPC_WALLET_ERROR,
+            "Burn transaction commit failed: " +
+                FormatStateMessage(state)
+        );
+    }
+
+    result.pushKV(
+        "txid",
+        walletTx.GetHash().GetHex()
+    );
+
+    result.pushKV("preview", false);
+    result.pushKV("committed", true);
+
+    return result;
 }
 
-
-    return wtx.GetHash().GetHex();
-}
 
 
 UniValue listaddressgroupings(const JSONRPCRequest& request)
@@ -3375,9 +3480,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "walletlock",               &walletlock,               true,         {} },
     { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   true,         {"oldpassphrase","newpassphrase"} },
     { "wallet",             "walletpassphrase",         &walletpassphrase,         true,         {"passphrase","timeout"} },
-    { "wallet",             "getburnedtotal",           &getburnedtotal,           true,         {} },
-    { "wallet",             "burn",                     &burn,                     true,         {"amount"} },
-    { "wallet",             "removeprunedfunds",        &removeprunedfunds,        true,         {"txid"} }
+    { "wallet",             "burn",                     &burn,                     false,        {"amount", "subtractfeefromamount", "message", "preview"} },
+    { "wallet",             "removeprunedfunds",        &removeprunedfunds,        true,         {"txid"} },
 };
 
 

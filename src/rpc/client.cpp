@@ -43,6 +43,16 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getnetworkhashps", 1, "height" },
     { "sendtoaddress", 1, "amount" },
     { "sendtoaddress", 4, "subtractfeefromamount" },
+
+    { "burn", 0, "amount" },
+    { "burn", 1, "subtractfeefromamount" },
+    { "burn", 3, "preview" },
+
+    // FloofyChain burn history
+    { "listburntransactions", 0, "start_height" },
+    { "listburntransactions", 1, "block_count" },
+
+
     { "settxfee", 0, "amount" },
     { "getreceivedbyaddress", 1, "minconf" },
     { "getreceivedbyaccount", 1, "minconf" },
