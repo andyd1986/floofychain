@@ -454,7 +454,7 @@ BOOST_AUTO_TEST_CASE(auxpow_pow)
 /* ************************************************************************** */
 
 /**
- * Test the mainnet AuxPoW consensus transition at block 250000.
+ * Test the mainnet AuxPoW consensus transition at block 300000.
  *
  * This test deliberately does NOT perform mainnet Proof-of-Work mining.
  * Proof-of-Work validation is already covered by auxpow_pow using regtest.
@@ -463,27 +463,27 @@ BOOST_AUTO_TEST_CASE(auxpow_pow)
  *
  *   1. Mainnet consensus selection at heights:
  *
- *          249999 -> historical AuxPoW rule
- *          250000 -> new strict AuxPoW rule
- *          250001 -> new strict AuxPoW rule
+ *          299999 -> historical AuxPoW rule
+ *          300000 -> new strict AuxPoW rule
+ *          300001 -> new strict AuxPoW rule
  *
  *   2. Historical malformed chain-ID-666 AuxPoW:
  *
- *          249999 -> accepted
- *          250000 -> rejected
- *          250001 -> rejected
+ *          299999 -> accepted
+ *          300000 -> rejected
+ *          300001 -> rejected
  *
  *   3. Correctly constructed chain-ID-666 AuxPoW:
  *
- *          249999 -> accepted
- *          250000 -> accepted
- *          250001 -> accepted
+ *          299999 -> accepted
+ *          300000 -> accepted
+ *          300001 -> accepted
  *
  *   4. Tampered AuxPoW:
  *
- *          249999 -> accepted by historical compatibility rule
- *          250000 -> rejected by strict validation
- *          250001 -> rejected by strict validation
+ *          299999 -> accepted by historical compatibility rule
+ *          300000 -> rejected by strict validation
+ *          300001 -> rejected by strict validation
  */
 BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
 {
@@ -497,14 +497,14 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      * tree immediately before, exactly at, and immediately after the
      * activation height.
      */
-    const Consensus::Params& params249999 =
-        Params().GetConsensus(249999);
+    const Consensus::Params& params299999 =
+        Params().GetConsensus(299999);
 
-    const Consensus::Params& params250000 =
-        Params().GetConsensus(250000);
+    const Consensus::Params& params300000 =
+        Params().GetConsensus(300000);
 
-    const Consensus::Params& params250001 =
-        Params().GetConsensus(250001);
+    const Consensus::Params& params300001 =
+        Params().GetConsensus(300001);
 
     /*
      * ================================================================
@@ -520,17 +520,17 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
     );
 
     BOOST_CHECK_EQUAL(
-        params249999.nAuxpowChainId,
+        params299999.nAuxpowChainId,
         666
     );
 
     BOOST_CHECK_EQUAL(
-        params250000.nAuxpowChainId,
+        params300000.nAuxpowChainId,
         666
     );
 
     BOOST_CHECK_EQUAL(
-        params250001.nAuxpowChainId,
+        params300001.nAuxpowChainId,
         666
     );
 
@@ -540,36 +540,36 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      *
      * Verify the actual height-aware consensus transition.
      *
-     * Block 249999 must still use the historical compatibility rule.
+     * Block 299999 must still use the historical compatibility rule.
      *
-     * Block 250000 is the first block using full AuxPoW validation.
+     * Block 300000 is the first block using full AuxPoW validation.
      *
-     * Block 250001 must continue using full AuxPoW validation.
+     * Block 300001 must continue using full AuxPoW validation.
      * ================================================================
      */
 
     BOOST_TEST_MESSAGE(
-        "Checking AuxPoW consensus rule at height 249999"
+        "Checking AuxPoW consensus rule at height 299999"
     );
 
     BOOST_CHECK(
-        params249999.fAuxpowLegacyRule
+        params299999.fAuxpowLegacyRule
     );
 
     BOOST_TEST_MESSAGE(
-        "Checking AuxPoW consensus rule at height 250000"
+        "Checking AuxPoW consensus rule at height 300000"
     );
 
     BOOST_CHECK(
-        !params250000.fAuxpowLegacyRule
+        !params300000.fAuxpowLegacyRule
     );
 
     BOOST_TEST_MESSAGE(
-        "Checking AuxPoW consensus rule at height 250001"
+        "Checking AuxPoW consensus rule at height 300001"
     );
 
     BOOST_CHECK(
-        !params250001.fAuxpowLegacyRule
+        !params300001.fAuxpowLegacyRule
     );
 
     /*
@@ -577,15 +577,15 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      * strict chain-ID checking.
      */
     BOOST_CHECK(
-        params249999.fStrictChainId
+        params299999.fStrictChainId
     );
 
     BOOST_CHECK(
-        params250000.fStrictChainId
+        params300000.fStrictChainId
     );
 
     BOOST_CHECK(
-        params250001.fStrictChainId
+        params300001.fStrictChainId
     );
 
     /*
@@ -638,7 +638,7 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
 
     /*
      * ------------------------------------------------
-     * Height 249999
+     * Height 299999
      *
      * Historical compatibility rule is active.
      *
@@ -647,20 +647,20 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      */
 
     BOOST_TEST_MESSAGE(
-        "Legacy malformed AuxPoW at height 249999 should PASS"
+        "Legacy malformed AuxPoW at height 299999 should PASS"
     );
 
     BOOST_CHECK(
         legacyAuxpow.check(
             hashAux,
             ourChainId,
-            params249999
+            params299999
         )
     );
 
     /*
      * ------------------------------------------------
-     * Height 250000
+     * Height 300000
      *
      * Historical compatibility rule has been disabled.
      *
@@ -670,34 +670,34 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      */
 
     BOOST_TEST_MESSAGE(
-        "Legacy malformed AuxPoW at height 250000 should FAIL"
+        "Legacy malformed AuxPoW at height 300000 should FAIL"
     );
 
     BOOST_CHECK(
         !legacyAuxpow.check(
             hashAux,
             ourChainId,
-            params250000
+            params300000
         )
     );
 
     /*
      * ------------------------------------------------
-     * Height 250001
+     * Height 300001
      *
      * Full validation must remain active.
      * ------------------------------------------------
      */
 
     BOOST_TEST_MESSAGE(
-        "Legacy malformed AuxPoW at height 250001 should FAIL"
+        "Legacy malformed AuxPoW at height 300001 should FAIL"
     );
 
     BOOST_CHECK(
         !legacyAuxpow.check(
             hashAux,
             ourChainId,
-            params250001
+            params300001
         )
     );
 
@@ -785,38 +785,38 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      */
 
     BOOST_TEST_MESSAGE(
-        "Fully valid AuxPoW at height 249999 should PASS"
+        "Fully valid AuxPoW at height 299999 should PASS"
     );
 
     BOOST_CHECK(
         validAuxpow.check(
             hashAux,
             ourChainId,
-            params249999
+            params299999
         )
     );
 
     BOOST_TEST_MESSAGE(
-        "Fully valid AuxPoW at height 250000 should PASS"
+        "Fully valid AuxPoW at height 300000 should PASS"
     );
 
     BOOST_CHECK(
         validAuxpow.check(
             hashAux,
             ourChainId,
-            params250000
+            params300000
         )
     );
 
     BOOST_TEST_MESSAGE(
-        "Fully valid AuxPoW at height 250001 should PASS"
+        "Fully valid AuxPoW at height 300001 should PASS"
     );
 
     BOOST_CHECK(
         validAuxpow.check(
             hashAux,
             ourChainId,
-            params250001
+            params300001
         )
     );
 
@@ -837,17 +837,17 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
     badIndexAuxpow.nChainIndex++;
 
     /*
-     * Historical behaviour at 249999 should still bypass this error.
+     * Historical behaviour at 299999 should still bypass this error.
      */
     BOOST_TEST_MESSAGE(
-        "Tampered chain index at height 249999 should PASS under legacy rule"
+        "Tampered chain index at height 299999 should PASS under legacy rule"
     );
 
     BOOST_CHECK(
         badIndexAuxpow.check(
             hashAux,
             ourChainId,
-            params249999
+            params299999
         )
     );
 
@@ -855,14 +855,14 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      * At the activation block this corruption must be rejected.
      */
     BOOST_TEST_MESSAGE(
-        "Tampered chain index at height 250000 should FAIL"
+        "Tampered chain index at height 300000 should FAIL"
     );
 
     BOOST_CHECK(
         !badIndexAuxpow.check(
             hashAux,
             ourChainId,
-            params250000
+            params300000
         )
     );
 
@@ -870,14 +870,14 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      * And it must continue to be rejected after activation.
      */
     BOOST_TEST_MESSAGE(
-        "Tampered chain index at height 250001 should FAIL"
+        "Tampered chain index at height 300001 should FAIL"
     );
 
     BOOST_CHECK(
         !badIndexAuxpow.check(
             hashAux,
             ourChainId,
-            params250001
+            params300001
         )
     );
 
@@ -891,26 +891,26 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
      */
 
     BOOST_TEST_MESSAGE(
-        "Restored valid AuxPoW at height 250000 should PASS"
+        "Restored valid AuxPoW at height 300000 should PASS"
     );
 
     BOOST_CHECK(
         validAuxpow.check(
             hashAux,
             ourChainId,
-            params250000
+            params300000
         )
     );
 
     BOOST_TEST_MESSAGE(
-        "Restored valid AuxPoW at height 250001 should PASS"
+        "Restored valid AuxPoW at height 300001 should PASS"
     );
 
     BOOST_CHECK(
         validAuxpow.check(
             hashAux,
             ourChainId,
-            params250001
+            params300001
         )
     );
 
@@ -937,7 +937,7 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
         return false;
     };
 
-    const int testHeights[] = {249999, 250000, 250001};
+    const int testHeights[] = {299999, 300000, 300001};
     for (const int blockHeight : testHeights) {
         BOOST_TEST_MESSAGE(
             "Checking AuxPoW structure AND parent proof-of-work at height "
@@ -945,7 +945,7 @@ BOOST_AUTO_TEST_CASE(auxpow_mainnet_activation)
 
         Consensus::Params powParams = Params().GetConsensus(blockHeight);
         powParams.powLimit = ArithToUint256(easyLimit);
-        const bool expectLegacy = (blockHeight < 250000);
+        const bool expectLegacy = (blockHeight < 300000);
         BOOST_REQUIRE_EQUAL(powParams.fAuxpowLegacyRule, expectLegacy);
 
         CBlockHeader child;
@@ -1022,7 +1022,7 @@ BOOST_AUTO_TEST_CASE(native_pow_unchanged_at_auxpow_activation)
     SelectParams(CBaseChainParams::MAIN);
     const arith_uint256 easyLimit = (~arith_uint256(0) >> 1);
     const unsigned int easyBits = easyLimit.GetCompact();
-    const int heights[] = {249999, 250000, 250001};
+    const int heights[] = {299999, 300000, 300001};
 
     for (const int height : heights) {
         Consensus::Params params = Params().GetConsensus(height);
@@ -1091,11 +1091,11 @@ BOOST_AUTO_TEST_CASE(auxpow_full_verifier_legacy_boundary)
     BOOST_REQUIRE(found);
     child.SetAuxpow(new CAuxPow(builder.get()));
 
-    const int heights[] = {249999, 250000, 250001};
+    const int heights[] = {299999, 300000, 300001};
     for (const int height : heights) {
         Consensus::Params params = Params().GetConsensus(height);
         params.powLimit = ArithToUint256(easyLimit);
-        const bool expected = height < 250000;
+        const bool expected = height < 300000;
         BOOST_CHECK_MESSAGE(CheckAuxPowProofOfWork(child, params) == expected,
                             "Malformed AuxPoW full verifier at " << height
                             << " should " << (expected ? "accept" : "reject"));
@@ -1105,7 +1105,7 @@ BOOST_AUTO_TEST_CASE(auxpow_full_verifier_legacy_boundary)
 
 /* ************************************************************************** */
 /**
- * The second fork activates contextual AuxPoW enforcement at height 300000.
+ * The single fork activates strict AuxPoW rules and contextual enforcement at height 300000.
  * This test checks the consensus predicates and the synthetic verifier
  * inputs at the boundary.  It is NOT a ProcessNewBlock integration test:
  * the production contextual gate is tested separately by the source audit.
@@ -1142,14 +1142,14 @@ BOOST_AUTO_TEST_CASE(auxpow_contextual_enforcement_300000_boundary)
         params.powLimit = ArithToUint256(easyLimit);
         const bool gateActive = height >= kEnforcementHeight;
 
-        // The 250000 rule is already strict for all three heights.
-        BOOST_REQUIRE_MESSAGE(!params.fAuxpowLegacyRule,
-                              "Strict consensus must be selected at " << height);
-        BOOST_REQUIRE_MESSAGE(!CheckAuxPowProofOfWork(child, params),
-                              "Malformed AuxPoW must fail strict verification at " << height);
+        // The same activation height controls both the consensus transition
+        // and the additional contextual enforcement.
+        BOOST_REQUIRE_MESSAGE(params.fAuxpowLegacyRule == !gateActive,
+                              "Legacy consensus must switch at " << height);
+        BOOST_REQUIRE_MESSAGE(CheckAuxPowProofOfWork(child, params) == !gateActive,
+                              "Malformed AuxPoW must follow the single fork at " << height);
 
-        // Simulate only the additional contextual check's decision.
-        // Prior to 300000 the production path must not call this verifier.
+        // This checks the expected predicate, not ProcessNewBlock itself.
         const bool contextualWouldReject =
             gateActive && child.IsAuxpow() && !CheckAuxPowProofOfWork(child, params);
         BOOST_CHECK_MESSAGE(contextualWouldReject == gateActive,
@@ -1209,8 +1209,8 @@ BOOST_AUTO_TEST_CASE(auxpow_valid_at_300000_boundary)
         CAuxPow corrupted = builder.get();
         ++corrupted.nChainIndex;
         child.SetAuxpow(new CAuxPow(corrupted));
-        BOOST_CHECK_MESSAGE(!CheckAuxPowProofOfWork(child, params),
-                            "Tampered chain index must fail strict verification at " << height);
+        BOOST_CHECK_MESSAGE(CheckAuxPowProofOfWork(child, params) == (height < 300000),
+                            "Tampered chain index must follow the single fork at " << height);
         child.SetAuxpow(new CAuxPow(builder.get()));
     }
 }
