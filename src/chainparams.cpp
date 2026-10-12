@@ -155,11 +155,11 @@ public:
 	/*
  	* New AuxPoW consensus rules.
 	*
- 	* Starting at block 250000, the historical chain-666 shortcut is
+ 	* Starting at block 300000, the historical chain-666 shortcut is
  	* disabled and normal AuxPoW validation is enforced.
  	*/
 	newAuxpowConsensus = auxpowConsensus;
-	newAuxpowConsensus.nHeightEffective = 250000;
+	newAuxpowConsensus.nHeightEffective = 300000;
 	newAuxpowConsensus.fAuxpowLegacyRule = false;
 
 	/*

@@ -3129,6 +3129,28 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.DoS(100, false, REJECT_INVALID, "bad-diffbits", false, "incorrect proof of work");
 
+
+// FloofyChain: Height-aware AuxPoW enforcement activation.
+//
+// Historical blocks retain their original validation behavior.
+// From height 300000 onward, AuxPoW blocks must pass the
+// height-specific consensus rules.
+
+static constexpr int FLOOFY_AUXPOW_ENFORCEMENT_HEIGHT = 300000;
+
+if (nHeight >= FLOOFY_AUXPOW_ENFORCEMENT_HEIGHT &&
+    block.IsAuxpow() &&
+    !CheckAuxPowProofOfWork(block, consensusParams))
+{
+    return state.DoS(
+        100,
+        false,
+        REJECT_INVALID,
+        "bad-auxpow",
+        false,
+        "AuxPoW failed height-specific consensus validation"
+    );
+}
     // Check against checkpoints
     if (fCheckpointsEnabled) {
         // Don't accept any forks from the main chain prior to last checkpoint.
