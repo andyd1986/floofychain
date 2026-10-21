@@ -15,6 +15,15 @@ class CBlockIndex;
 class uint256;
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&);
+void FloofyGetRollingWindowCounts(const CBlockIndex* parent,
+                                  const Consensus::Params& params,
+                                  uint32_t& native, uint32_t& auxpow);
+unsigned int FloofyApplyRollingBalance(unsigned int baseBits,
+                                       const CBlockIndex* parent,
+                                       bool auxpowCandidate,
+                                       const Consensus::Params& params);
+// Experimental parent-time DAA timestamp check: MTP and bounded future drift.
+bool FloofyAdaptiveTimestampValid(const CBlockIndex* pindexLast, const CBlockHeader* pblock, int64_t localTime);
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params&);
 
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */

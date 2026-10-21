@@ -182,6 +182,13 @@ public:
     //! (memory only) Total amount of work (expected number of hashes) in the chain up to and including this block
     arith_uint256 nChainWork;
 
+    //! (memory only) Accepted post-activation block counts and most recent
+    //! blocks for each mining type on THIS branch. Rebuilt after restart.
+    uint32_t nFloofyNativeCount;
+    uint32_t nFloofyAuxpowCount;
+    const CBlockIndex* pFloofyLastNative;
+    const CBlockIndex* pFloofyLastAuxpow;
+
     //! Number of transactions in this block.
     //! Note: in a potential headers-first mode, this number cannot be relied upon
     unsigned int nTx;
@@ -217,6 +224,9 @@ public:
         nDataPos = 0;
         nUndoPos = 0;
         nChainWork = arith_uint256();
+        nFloofyNativeCount = 0;
+        nFloofyAuxpowCount = 0;
+        pFloofyLastNative = pFloofyLastAuxpow = nullptr;
         nTx = 0;
         nChainTx = 0;
         nStatus = 0;
@@ -351,6 +361,30 @@ public:
     inline bool IsAuxpow() const
     {
         return nVersion & CPureBlockHeader::VERSION_AUXPOW;
+    }
+
+    /** Build independent mining histories from this block's exact parent.
+     * Invoke on adding a header and on loading the block index in height order.
+     * The caches do not change disk serialization or historical blocks.
+     */
+    void BuildFloofyMiningHistory(bool active)
+    {
+        if (!active) {
+            nFloofyNativeCount = nFloofyAuxpowCount = 0;
+            pFloofyLastNative = pFloofyLastAuxpow = nullptr;
+            return;
+        }
+        nFloofyNativeCount = pprev ? pprev->nFloofyNativeCount : 0;
+        nFloofyAuxpowCount = pprev ? pprev->nFloofyAuxpowCount : 0;
+        pFloofyLastNative = pprev ? pprev->pFloofyLastNative : nullptr;
+        pFloofyLastAuxpow = pprev ? pprev->pFloofyLastAuxpow : nullptr;
+        if (IsAuxpow()) {
+            ++nFloofyAuxpowCount;
+            pFloofyLastAuxpow = this;
+        } else {
+            ++nFloofyNativeCount;
+            pFloofyLastNative = this;
+        }
     }
 
     /* Analyse the block version.  */

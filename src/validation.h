@@ -499,7 +499,10 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = t
 /** Context-dependent validity checks.
  *  By "context", we mean only the previous block headers, but not the UTXO
  *  set; UTXO-related validity checks are done in ConnectBlock(). */
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, const CBlockIndex* pindexPrev, int64_t nAdjustedTime);
+// fCheckAuxpowProof=false is restricted to unfinished mining templates.
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state,
+                                const CBlockIndex* pindexPrev, int64_t nAdjustedTime,
+                                bool fCheckAuxpowProof = true);
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state, const CBlockIndex* pindexPrev);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.

@@ -58,8 +58,6 @@ const std::string CLIENT_NAME("Floofonauts");
 #define BUILD_DESC_FROM_UNKNOWN(maj, min, build) \
     "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(build) "-unk"
 
-const std::string CLIENT_BUILD(CLIENT_VERSION_SUFFIX);
-
 static std::string FormatVersion(int nVersion)
 {
     if (nVersion % 100 == 0)
@@ -67,6 +65,11 @@ static std::string FormatVersion(int nVersion)
     else
         return strprintf("%d.%d.%d.%d", nVersion / 1000000, (nVersion / 10000) % 100, (nVersion / 100) % 100, nVersion % 100);
 }
+
+// The full version is used by floofyd, floofy-cli, floofy-tx,
+// Qt's About dialog and the daemon startup log.
+const std::string CLIENT_BUILD("v" + FormatVersion(CLIENT_VERSION)
+                               + CLIENT_VERSION_SUFFIX);
 
 std::string FormatFullVersion()
 {

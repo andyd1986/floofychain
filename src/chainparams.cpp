@@ -73,7 +73,7 @@ class CMainParams : public CChainParams
 private:
     Consensus::Params digishieldConsensus;
     Consensus::Params auxpowConsensus;
-    Consensus::Params newAuxpowConsensus;
+    Consensus::Params dualMiningConsensus;
 
 public:
     CMainParams()
@@ -131,6 +131,9 @@ public:
  	* chain-666 compatibility behaviour.
  	*/
 	consensus.fAuxpowLegacyRule = true;
+        // Proposed single mainnet hard fork: strict AuxPoW joins all other
+        // new consensus rules at height 245000, not the previous 300000.
+        consensus.nAuxpowStrictValidationHeight = 245000;
 	consensus.nHeightEffective = 0;
 
         // Blocks 145000 - 371336 are Digishield without AuxPoW
@@ -152,31 +155,27 @@ public:
  	*/
 	auxpowConsensus.fAuxpowLegacyRule = true;
 
-	/*
- 	* New AuxPoW consensus rules.
-	*
- 	* Starting at block 300000, the historical chain-666 shortcut is
- 	* disabled and normal AuxPoW validation is enforced.
- 	*/
-	newAuxpowConsensus = auxpowConsensus;
-	newAuxpowConsensus.nHeightEffective = 300000;
-	newAuxpowConsensus.fAuxpowLegacyRule = false;
+        // Proposed coordinated hard fork at height 245000. The historical
+        // consensus tree and block validation remain unchanged through 244999.
+        // Strict AuxPoW, anchored difficulty, five-minute target, and
+        // two always-eligible mining lanes activate together.
+        dualMiningConsensus = auxpowConsensus;
+        dualMiningConsensus.nHeightEffective = 245000;
+        dualMiningConsensus.fAuxpowLegacyRule = false;
+        dualMiningConsensus.nAuxpowStrictValidationHeight = 245000;
+        dualMiningConsensus.fFloofyAdaptiveDifficulty = true;
+        dualMiningConsensus.nPowTargetSpacing = 5 * 60; // overall 5min target
+        dualMiningConsensus.nPowTargetTimespan = 5 * 60;
+        dualMiningConsensus.nFloofyAdaptiveHalfLife = 60 * 60;
+        dualMiningConsensus.fFloofyDualPowDifficulty = true;
 
-	/*
-	* Assemble the binary search tree of consensus parameters.
- 	*
- 	* digishieldConsensus
- 	*       |
- 	*       +---- consensus
- 	*       |
- 	*       +---- auxpowConsensus
- 	*                    |
- 	*                    +---- newAuxpowConsensus
- 	*/
-	pConsensusRoot = &digishieldConsensus;
-	digishieldConsensus.pLeft = &consensus;
-	digishieldConsensus.pRight = &auxpowConsensus;
-	auxpowConsensus.pRight = &newAuxpowConsensus;
+        // Both independent difficulty streams use block 244999 as their
+        // anchor. Either mining method may produce block 245000.
+        // Regtest stays on its own 20/30/40/50 activation schedule.
+        pConsensusRoot = &digishieldConsensus;
+        digishieldConsensus.pLeft = &consensus;
+        digishieldConsensus.pRight = &auxpowConsensus;
+        auxpowConsensus.pRight = &dualMiningConsensus;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -195,7 +194,7 @@ public:
         consensus.hashGenesisBlock = genesis.GetHash();
         digishieldConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         auxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
-	newAuxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+        dualMiningConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         assert(consensus.hashGenesisBlock == uint256S("0xd4c3cabcae34cbf79a2f5198806e16d5176c097973c6b0305ddd8b9e9d139ad0"));
         assert(genesis.hashMerkleRoot == uint256S("0xfb302a48e0870d4f80943e4ced86db117f623993fcd1de6b7f59893cf2684124"));
 
@@ -376,6 +375,9 @@ class CRegTestParams : public CChainParams
 private:
     Consensus::Params digishieldConsensus;
     Consensus::Params auxpowConsensus;
+    Consensus::Params strictAuxpowConsensus;
+    Consensus::Params adaptiveDifficultyConsensus;
+    Consensus::Params dualMiningConsensus;
 
 public:
     CRegTestParams()
@@ -414,9 +416,14 @@ public:
         consensus.defaultAssumeValid = uint256S("0x00");
 
         // AuxPow parameters
-        consensus.nAuxpowChainId = 0x0062; // 98 - Josh Wise!
+        // Experimental regtest fork harness: use the real Floofy chain
+        // ID to reproduce mainnet's historical chain-666 AuxPoW shortcut.
+        // Regtest genesis already embeds chain ID 666; its hash is unchanged.
+        consensus.nAuxpowChainId = 0x029A; // 666
         consensus.fStrictChainId = true;
         consensus.fAllowLegacyBlocks = true;
+        consensus.fAuxpowLegacyRule = true;
+        consensus.nAuxpowStrictValidationHeight = 30;
 
         // Floofy parameters
         consensus.fSimplifiedRewards = true;
@@ -427,13 +434,43 @@ public:
         digishieldConsensus.nPowTargetTimespan = 1; // regtest: also retarget every second in digishield mode, for conformity
         digishieldConsensus.fDigishieldDifficultyCalculation = true;
 
+        // Activation 20: AuxPoW is allowed (historical chain-666 behaviour).
         auxpowConsensus = digishieldConsensus;
         auxpowConsensus.fAllowLegacyBlocks = false;
+        auxpowConsensus.fAuxpowLegacyRule = true;
         auxpowConsensus.nHeightEffective = 20;
 
-        // Assemble the binary search tree of parameters
+        // Activation 30: strict structural AuxPoW verification, matching
+        // the mainnet block-300000 rules but with a short regtest chain.
+        strictAuxpowConsensus = auxpowConsensus;
+        strictAuxpowConsensus.nHeightEffective = 30;
+        strictAuxpowConsensus.fAuxpowLegacyRule = false;
+
+        // Activation 40: anchored adaptive DAA, targeting five-minute blocks.
+        // Earlier regtest blocks keep their existing bootstrap rules.
+        adaptiveDifficultyConsensus = strictAuxpowConsensus;
+        adaptiveDifficultyConsensus.nHeightEffective = 40;
+        adaptiveDifficultyConsensus.fFloofyAdaptiveDifficulty = true;
+        adaptiveDifficultyConsensus.nFloofyAdaptiveHalfLife = 60 * 60;
+        adaptiveDifficultyConsensus.nPowTargetSpacing = 5 * 60;
+        adaptiveDifficultyConsensus.nPowTargetTimespan = 5 * 60;
+        adaptiveDifficultyConsensus.fPowNoRetargeting = false;
+        adaptiveDifficultyConsensus.fPowAllowMinDifficultyBlocks = false;
+        adaptiveDifficultyConsensus.fPowAllowDigishieldMinDifficultyBlocks = false;
+
+        // PRIVATE REGTEST: strict parent-type alternation from height 50.
+        dualMiningConsensus = adaptiveDifficultyConsensus;
+        dualMiningConsensus.nHeightEffective = 50;
+        dualMiningConsensus.fFloofyDualPowDifficulty = true;
+
+        // regtest consensus tree:
+        // 0..9 native / 10..19 DigiShield / 20..29 legacy AuxPoW
+        // 30..39 strict AuxPoW / 40+ strict AuxPoW plus adaptive difficulty.
         digishieldConsensus.pLeft = &consensus;
         digishieldConsensus.pRight = &auxpowConsensus;
+        auxpowConsensus.pRight = &strictAuxpowConsensus;
+        strictAuxpowConsensus.pRight = &adaptiveDifficultyConsensus;
+        adaptiveDifficultyConsensus.pRight = &dualMiningConsensus;
         pConsensusRoot = &digishieldConsensus;
 
         pchMessageStart[0] = 0xfa;
@@ -448,6 +485,9 @@ public:
         consensus.hashGenesisBlock = genesis.GetHash();
         digishieldConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         auxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+        strictAuxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+        adaptiveDifficultyConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+        dualMiningConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         assert(consensus.hashGenesisBlock == uint256S("0xbe7e23a656babcef9d3304d396b6155233ecbcce5a73c1eb40544472f40e2b17"));
         assert(genesis.hashMerkleRoot == uint256S("0xfb302a48e0870d4f80943e4ced86db117f623993fcd1de6b7f59893cf2684124"));
 

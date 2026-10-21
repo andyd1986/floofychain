@@ -2816,6 +2816,9 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
         pindexNew->BuildSkip();
     }
+    // Cache independent PoW/AuxPoW history on the branch being indexed.
+    pindexNew->BuildFloofyMiningHistory(
+        Params().GetConsensus(pindexNew->nHeight).fFloofyDualPowDifficulty);
     pindexNew->nTimeMax = (pindexNew->pprev ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime) : pindexNew->nTime);
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
@@ -3103,7 +3106,9 @@ std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBloc
     return commitment;
 }
 
-bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, const CBlockIndex* pindexPrev, int64_t nAdjustedTime)
+bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state,
+                                const CBlockIndex* pindexPrev, int64_t nAdjustedTime,
+                                bool fCheckAuxpowProof)
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
     const CChainParams& params = Params();
@@ -3125,20 +3130,25 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
                                     __func__, pindexPrev->nHeight + 1, consensusParams.nHeightEffective),
                          REJECT_INVALID, "early-auxpow-block");
 
+    // Both native PoW and AuxPoW are eligible after the dual-DAA fork.
+    // The candidate must still satisfy its own difficulty and PoW.
+    // Candidate time no longer changes its own difficulty. Retain a
+    // five-minute bound on future-dated accepted history. Existing
+    // median-time-past validation also applies below.
+    if (consensusParams.fFloofyAdaptiveDifficulty &&
+        !FloofyAdaptiveTimestampValid(pindexPrev, &block, GetTime()))
+        return state.Invalid(false, REJECT_INVALID, "bad-adaptive-time",
+                             "block timestamp fails MTP or future-time limit");
+
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.DoS(100, false, REJECT_INVALID, "bad-diffbits", false, "incorrect proof of work");
 
 
-// FloofyChain: Height-aware AuxPoW enforcement activation.
-//
-// Historical blocks retain their original validation behavior.
-// From height 300000 onward, AuxPoW blocks must pass the
-// height-specific consensus rules.
-
-static constexpr int FLOOFY_AUXPOW_ENFORCEMENT_HEIGHT = 300000;
-
-if (nHeight >= FLOOFY_AUXPOW_ENFORCEMENT_HEIGHT &&
+// FloofyChain: height-aware strict AuxPoW verification joins the
+// proposed mainnet hard fork at 245000; regtest still activates at 30.
+if (fCheckAuxpowProof &&
+    nHeight >= static_cast<int>(consensusParams.nAuxpowStrictValidationHeight) &&
     block.IsAuxpow() &&
     !CheckAuxPowProofOfWork(block, consensusParams))
 {
@@ -3492,7 +3502,12 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
     // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev, GetAdjustedTime()))
+    // Only an unfinished block assembler template (both flags false)
+    // skips expensive/unavailable AuxPoW parent proof. Real network
+    // acceptance and proposal checks continue to verify it.
+    const bool fCheckAuxpowProof = fCheckPOW || fCheckMerkleRoot;
+    if (!ContextualCheckBlockHeader(block, state, pindexPrev,
+                                    GetAdjustedTime(), fCheckAuxpowProof))
         return error("%s: Consensus::ContextualCheckBlockHeader: %s", __func__, FormatStateMessage(state));
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return error("%s: Consensus::CheckBlock: %s", __func__, FormatStateMessage(state));
@@ -3729,6 +3744,9 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
     BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
     {
         CBlockIndex* pindex = item.second;
+        // Restore in-memory lane caches after restart, in height order.
+        pindex->BuildFloofyMiningHistory(
+            chainparams.GetConsensus(pindex->nHeight).fFloofyDualPowDifficulty);
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         pindex->nTimeMax = (pindex->pprev ? std::max(pindex->pprev->nTimeMax, pindex->nTime) : pindex->nTime);
         // We can link the chain of blocks for which we've received transactions at some point.

@@ -115,7 +115,8 @@ UniValue generateBlocks(std::shared_ptr<CReserveScript> coinbaseScript, int nGen
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd)
     {
-        std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, fMineWitnessTx));
+        std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(
+            coinbaseScript->reserveScript, fMineWitnessTx, nMineAuxPow != 0));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         CBlock *pblock = &pblocktemplate->block;
@@ -1002,7 +1003,9 @@ void AuxMiningCheck()
        past the point of merge-mining start.  Check nevertheless.  */
     {
         LOCK(cs_main);
-        if (Params().GetConsensus(chainActive.Height() + 1).fAllowLegacyBlocks)
+        const Consensus::Params& consensus =
+            Params().GetConsensus(chainActive.Height() + 1);
+        if (consensus.fAllowLegacyBlocks)
             throw std::runtime_error("getauxblock method is not yet available");
     }
 }
@@ -1036,6 +1039,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
         LOCK(cs_main);
 
         // Update block
+        // Anchored work depends on the accepted tip, not wall-clock time.
         if (pblock == nullptr || pindexPrev != chainActive.Tip()
             || (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast
                 && GetTime() - nStart > 60))
@@ -1051,7 +1055,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey)
 
             // Create new block with nonce = 0 and extraNonce = 1
             std::unique_ptr<CBlockTemplate> newBlock
-                = BlockAssembler(Params()).CreateNewBlock(scriptPubKey, fMineWitnessTx);
+                = BlockAssembler(Params()).CreateNewBlock(scriptPubKey, fMineWitnessTx, true);
             if (!newBlock)
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
 
@@ -1191,7 +1195,7 @@ UniValue getauxblockbip22(const JSONRPCRequest& request)
         const bool fMineWitnessTx = false;
         {
             LOCK(cs_main);
-            if (pindexPrev != chainActive.Tip()
+            if (pblock == nullptr || pindexPrev != chainActive.Tip()
                 || (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast
                     && GetTime() - nStart > 60))
             {
@@ -1204,7 +1208,7 @@ UniValue getauxblockbip22(const JSONRPCRequest& request)
                 }
 
                 // Create new block with nonce = 0 and extraNonce = 1
-                std::unique_ptr<CBlockTemplate> newBlock(BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, fMineWitnessTx));
+                std::unique_ptr<CBlockTemplate> newBlock(BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, fMineWitnessTx, true));
                 if (!newBlock)
                     throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
 

@@ -69,6 +69,11 @@ struct Params {
 
     /** Floofy-specific parameters */
     bool fDigishieldDifficultyCalculation;
+    // Existing experimental fixed-anchor, accepted-parent difficulty.
+    bool fFloofyAdaptiveDifficulty = false;
+    int64_t nFloofyAdaptiveHalfLife = 0;
+    // Separate ASERT for native and AuxPoW, both eligible for every block.
+    bool fFloofyDualPowDifficulty = false;
     bool fPowAllowDigishieldMinDifficultyBlocks; // Allow minimum difficulty blocks where a retarget would normally occur
     bool fSimplifiedRewards; // Use block height derived rewards rather than previous block hash derived
 
@@ -87,6 +92,8 @@ struct Params {
      * is enabled. When false, normal AuxPoW validation is enforced.
      */
     bool fAuxpowLegacyRule;
+    // Height-dependent strict AuxPoW verification activation per network.
+    uint32_t nAuxpowStrictValidationHeight = 300000;
 
     /** Height-aware consensus parameters */
     uint32_t nHeightEffective; // When these parameters come into use

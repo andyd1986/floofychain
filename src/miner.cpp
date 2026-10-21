@@ -63,12 +63,17 @@ public:
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
     int64_t nOldTime = pblock->nTime;
-    int64_t nNewTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
+    // Adaptive target is independent of candidate nTime; MTP is sufficient
+    // for historical ordering, without forced parent timestamp monotonicity.
+    int64_t nNewTime = std::max(
+        pindexPrev->GetMedianTimePast() + 1,
+        consensusParams.fFloofyAdaptiveDifficulty ? GetTime() : GetAdjustedTime());
 
     if (nOldTime < nNewTime)
         pblock->nTime = nNewTime;
 
-    // Updating time can change work required on testnet:
+    // Only the historical minimum-difficulty exception depends on
+    // candidate nTime; parent-time ASERT remains fixed until the tip moves.
     if (consensusParams.fPowAllowMinDifficultyBlocks)
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
 
@@ -130,7 +135,8 @@ void BlockAssembler::resetBlock()
     blockFinished = false;
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fMineWitnessTx)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(
+    const CScript& scriptPubKeyIn, bool fMineWitnessTx, bool fMineAuxPow)
 {
     int64_t nTimeStart = GetTimeMicros();
 
@@ -155,7 +161,16 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     const int32_t nChainId = consensus.nAuxpowChainId;
     const int32_t nVersion = VERSIONBITS_LAST_OLD_BLOCK_VERSION;
     pblock->SetBaseVersion(nVersion, nChainId);
-    pblock->nTime = GetAdjustedTime();
+    // Serialisation of an AuxPoW-marked header REQUIRES auxpow != nullptr.
+    // BlockAssembler checks the unfinished template before the RPC mining
+    // path can attach its actual parent proof. Provide a temporary object,
+    // which generateBlocks()/submitauxblock will replace with real proof.
+    // The proof itself is checked when the finished block is submitted.
+    if (fMineAuxPow)
+        pblock->SetAuxpow(new CAuxPow());
+    else
+        pblock->SetAuxpowFlag(false);
+    pblock->nTime = consensus.fFloofyAdaptiveDifficulty ? GetTime() : GetAdjustedTime();
     const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
 
     nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
