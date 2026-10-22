@@ -13,6 +13,8 @@
 class BitcoinGUI;
 class ClientModel;
 class OverviewPage;
+class BurnPage;
+class MempoolPage;
 class PlatformStyle;
 class ReceiveCoinsDialog;
 class SendCoinsDialog;
@@ -61,6 +63,8 @@ private:
     WalletModel *walletModel;
 
     OverviewPage *overviewPage;
+    BurnPage *burnPage;
+    MempoolPage *mempoolPage;
     QWidget *transactionsPage;
     ReceiveCoinsDialog *receiveCoinsPage;
     SendCoinsDialog *sendCoinsPage;
@@ -76,6 +80,8 @@ private:
 public Q_SLOTS:
     /** Switch to overview (home) page */
     void gotoOverviewPage();
+    void gotoBurnPage();
+    void gotoMempoolPage();
     /** Switch to history (transactions) page */
     void gotoHistoryPage();
     /** Switch to import keys dialog */

@@ -21,6 +21,7 @@
 #include "optionsmodel.h"
 #include "platformstyle.h"
 #include "rpcconsole.h"
+#include "sparkleoverlay.h"
 #include "utilitydialog.h"
 
 #ifdef ENABLE_WALLET
@@ -93,6 +94,9 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     appMenuBar(0),
     overviewAction(0),
     historyAction(0),
+    burnAction(0),
+    mempoolAction(0),
+    sparkleAction(0),
     quitAction(0),
     sendCoinsAction(0),
     sendCoinsMenuAction(0),
@@ -119,11 +123,16 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     rpcConsole(0),
     helpMessageDialog(0),
     modalOverlay(0),
+    sparkleOverlay(0),
     prevBlocks(0),
     spinnerFrame(0),
     platformStyle(_platformStyle)
 {
-    GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
+    // Start with a comfortable normal-size window rather than restoring the
+    // old full-screen dimensions saved by earlier GUI releases. Use a new
+    // settings key once; subsequent launches remember the user's *normal*
+    // (unmaximised) window size.
+    GUIUtil::restoreWindowGeometry("nWindowFloofyDashboard", QSize(1080, 650), this);
 
     QString windowTitle = tr(PACKAGE_NAME) + " - ";
 #ifdef ENABLE_WALLET
@@ -243,7 +252,7 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     QString curStyle = QApplication::style()->metaObject()->className();
     if(curStyle == "QWindowsStyle" || curStyle == "QWindowsXPStyle")
     {
-        progressBar->setStyleSheet("QProgressBar { background-color: #e8e8e8; border: 1px solid grey; border-radius: 7px; padding: 1px; text-align: center; } QProgressBar::chunk { background: QLinearGradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #FF8000, stop: 1 orange); border-radius: 7px; margin: 0px; }");
+        progressBar->setStyleSheet("QProgressBar { background-color: #e8e8e8; border: 1px solid grey; border-radius: 7px; padding: 1px; text-align: center; } QProgressBar::chunk { background: QLinearGradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #8B80D6, stop: 1 #C4B5FD); border-radius: 7px; margin: 0px; }");
     }
 
     statusBar()->addWidget(progressBarLabel);
@@ -261,6 +270,14 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
 
     connect(connectionsControl, SIGNAL(clicked(QPoint)), this, SLOT(toggleNetworkActive()));
 
+    // Purely visual sparkles: no RPC, wallet, or chain-state interaction.
+    // Create before ModalOverlay so the synchronization panel stays on top.
+#ifdef ENABLE_WALLET
+    if (walletFrame && sparkleAction) {
+        sparkleOverlay = new SparkleOverlay(walletFrame);
+        sparkleOverlay->setSparkling(sparkleAction->isChecked());
+    }
+#endif
     modalOverlay = new ModalOverlay(this->centralWidget());
 #ifdef ENABLE_WALLET
     if(enableWallet) {
@@ -276,7 +293,19 @@ BitcoinGUI::~BitcoinGUI()
     // Unsubscribe from notifications from core
     unsubscribeFromCoreSignals();
 
-    GUIUtil::saveWindowGeometry("nWindow", this);
+    // Persist the restorable window rectangle, never maximised or minimised
+    // dimensions. On restart the wallet opens normally; the user can still
+    // maximise or minimise it using the standard Windows title-bar controls.
+    if (isMaximized() || isMinimized()) {
+        const QRect normal = normalGeometry();
+        if (normal.isValid() && normal.width() > 0 && normal.height() > 0) {
+            QSettings settings;
+            settings.setValue("nWindowFloofyDashboardPos", normal.topLeft());
+            settings.setValue("nWindowFloofyDashboardSize", normal.size());
+        }
+    } else {
+        GUIUtil::saveWindowGeometry("nWindowFloofyDashboard", this);
+    }
     if(trayIcon) // Hide tray icon, as deleting will let it linger until quit (on Ubuntu)
         trayIcon->hide();
 #ifdef Q_OS_MAC
@@ -327,6 +356,29 @@ void BitcoinGUI::createActions()
     historyAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_4));
     tabGroup->addAction(historyAction);
 
+    burnAction = new QAction(platformStyle->SingleColorIcon(":/icons/remove"), tr("&Burn FLOOF"), this);
+    burnAction->setStatusTip(tr("Permanently burn FLOOF using OP_RETURN"));
+    burnAction->setCheckable(true);
+    burnAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
+    tabGroup->addAction(burnAction);
+
+    mempoolAction = new QAction(platformStyle->SingleColorIcon(":/icons/history"), tr("&Mempool"), this);
+    mempoolAction->setStatusTip(tr("Browse pending transactions on this node"));
+    mempoolAction->setCheckable(true);
+    mempoolAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    tabGroup->addAction(mempoolAction);
+
+    sparkleAction = new QAction(tr("✨ &Sparkling wallet"), this);
+    sparkleAction->setStatusTip(tr("Show subtle, animated pastel sparkle effects"));
+    sparkleAction->setCheckable(true);
+    sparkleAction->setChecked(
+        QSettings().value("floofy/sparklesEnabled", true).toBool());
+    connect(sparkleAction, &QAction::toggled, this, [this](bool enabled) {
+        QSettings().setValue("floofy/sparklesEnabled", enabled);
+        if (sparkleOverlay)
+            sparkleOverlay->setSparkling(enabled);
+    });
+
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
@@ -342,6 +394,8 @@ void BitcoinGUI::createActions()
     connect(receiveCoinsMenuAction, SIGNAL(triggered()), this, SLOT(gotoReceiveCoinsPage()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(gotoHistoryPage()));
+    connect(burnAction, SIGNAL(triggered()), this, SLOT(gotoBurnPage()));
+    connect(mempoolAction, SIGNAL(triggered()), this, SLOT(gotoMempoolPage()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(platformStyle->TextColorIcon(":/icons/quit"), tr("E&xit"), this);
@@ -461,6 +515,10 @@ void BitcoinGUI::createMenuBar()
         settings->addSeparator();
     }
     settings->addAction(optionsAction);
+    if (walletFrame) {
+        settings->addSeparator();
+        settings->addAction(sparkleAction);
+    }
 
     QMenu *help = appMenuBar->addMenu(tr("&Help"));
     if(walletFrame)
@@ -479,11 +537,14 @@ void BitcoinGUI::createToolBars()
     {
         QToolBar *toolbar = addToolBar(tr("Tabs toolbar"));
         toolbar->setMovable(false);
+        toolbar->setIconSize(QSize(16, 16));
         toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
         toolbar->addAction(overviewAction);
         toolbar->addAction(sendCoinsAction);
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
+        toolbar->addAction(burnAction);
+        toolbar->addAction(mempoolAction);
         overviewAction->setChecked(true);
     }
 }
@@ -583,6 +644,8 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     receiveCoinsAction->setEnabled(enabled);
     receiveCoinsMenuAction->setEnabled(enabled);
     historyAction->setEnabled(enabled);
+    burnAction->setEnabled(enabled);
+    mempoolAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
     changePassphraseAction->setEnabled(enabled);
@@ -706,6 +769,18 @@ void BitcoinGUI::gotoOverviewPage()
 {
     overviewAction->setChecked(true);
     if (walletFrame) walletFrame->gotoOverviewPage();
+}
+
+void BitcoinGUI::gotoBurnPage()
+{
+    burnAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoBurnPage();
+}
+
+void BitcoinGUI::gotoMempoolPage()
+{
+    mempoolAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoMempoolPage();
 }
 
 void BitcoinGUI::gotoHistoryPage()

@@ -1,0 +1,435 @@
+/*
+ * FloofyChain pastel blue / lavender wallet theme
+ * GUI-only: does not affect blockchain validation or serialization.
+ * Qt 5 QSS -- no external fonts or image assets required.
+ */
+QMainWindow, QDialog, QWidget#OverviewPage {
+    background-color: #F3F7FF;
+    color: #35324E;
+}
+QWidget { color: #35324E; }
+QLabel { background: transparent; }
+QGroupBox {
+    border: 1px solid #E3DEFA;
+    border-radius: 11px;
+    margin-top: 9px;
+    padding: 5px;
+    background: #FDFBFF;
+    font-weight: bold;
+}
+QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 6px; }
+
+QToolBar {
+    background: #DCD6FF;
+    border: 0;
+    border-bottom: 1px solid #C9BEF5;
+    padding: 3px;
+    spacing: 3px;
+}
+QToolButton {
+    background: transparent;
+    color: #35324E;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 7px;
+}
+QToolButton:hover { background: #EEE9FF; border-color: #D2C9F7; }
+QToolButton:checked, QToolButton:pressed {
+    background: #8B80D6;
+    color: white;
+    border-color: #756AC5;
+}
+QMenuBar { background: #F3F7FF; }
+QMenuBar::item { background: transparent; padding: 5px 8px; }
+QMenuBar::item:selected { background: #E5DEFF; border-radius: 5px; }
+QMenu {
+    background: #FFFFFF;
+    border: 1px solid #E3DEFA;
+    padding: 4px;
+}
+QMenu::item { padding: 6px 22px; }
+QMenu::item:selected { background: #DCD6FF; color: #35324E; }
+QStatusBar { background: #EDEAFF; border-top: 1px solid #E3DEFA; }
+QStatusBar QLabel { background: transparent; }
+
+QPushButton {
+    background: #A5B4FC;
+    color: #292744;
+    border: 1px solid #929EE3;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-weight: 600;
+    min-height: 16px;
+}
+QPushButton:hover { background: #C4B5FD; border-color: #A997E5; }
+QPushButton:pressed { background: #8B80D6; color: white; }
+QPushButton:disabled { background: #E5E7F2; color: #817E95; border-color: #DDDAE8; }
+QPushButton:focus { border: 2px solid #756AC5; }
+QPushButton#labelWalletStatus, QPushButton#labelTransactionsStatus {
+    background: transparent;
+    border: 0;
+    min-height: 0;
+    padding: 0;
+}
+QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QSpinBox,
+QDoubleSpinBox, QDateEdit, QDateTimeEdit {
+    background: #FFFFFF;
+    color: #35324E;
+    selection-background-color: #A5B4FC;
+    selection-color: #292744;
+    border: 1px solid #D9D1F2;
+    border-radius: 5px;
+    padding: 3px;
+}
+QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus,
+QComboBox:focus, QSpinBox:focus { border: 2px solid #8B80D6; }
+QComboBox::drop-down { border: 0; width: 20px; }
+QTabWidget::pane { border: 1px solid #E3DEFA; background: #FFFFFF; }
+QTabBar::tab {
+    background: #EAE5FF;
+    padding: 5px 9px;
+    margin-right: 1px;
+    border: 1px solid #D8CDF6;
+    border-bottom: 0;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+}
+QTabBar::tab:selected { background: #FFFFFF; color: #6658AA; }
+QTreeView, QTableView, QListView {
+    background: #FFFFFF;
+    alternate-background-color: #F6F3FF;
+    color: #35324E;
+    border: 1px solid #E3DEFA;
+    border-radius: 7px;
+    selection-background-color: #DCD6FF;
+    selection-color: #35324E;
+}
+QHeaderView::section {
+    background: #EAE5FF;
+    color: #35324E;
+    border: 0;
+    border-right: 1px solid #D8CDF6;
+    padding: 4px;
+}
+QProgressBar {
+    background: #F8F6FF;
+    color: #35324E;
+    border: 1px solid #D9D1F2;
+    border-radius: 6px;
+    text-align: center;
+}
+QProgressBar::chunk {
+    background: #A5B4FC;
+    border-radius: 6px;
+}
+QScrollBar:vertical { background: #F3F0FF; width: 11px; margin: 0; }
+QScrollBar::handle:vertical { background: #C4B5FD; border-radius: 5px; min-height: 24px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { background: #F3F0FF; height: 11px; margin: 0; }
+QScrollBar::handle:horizontal { background: #C4B5FD; border-radius: 5px; min-width: 24px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+
+QFrame#frame, QFrame#frame_2 {
+    background: #FDFBFF;
+    border: 1px solid #E3DEFA;
+    border-radius: 13px;
+}
+QFrame#networkStatsPanel { background: transparent; border: 0; }
+QFrame#networkStatsCard {
+    background: #F5F0FF;
+    border: 1px solid #DCD6FF;
+    border-radius: 12px;
+}
+QLabel#networkStatsTitle {
+    color: #635B99;
+    font-weight: bold;
+    font-size: 14px;
+}
+QLabel#networkStatsAmount {
+    color: #35324E;
+    font-weight: bold;
+    font-size: 17px;
+}
+QLabel#networkStatsStatus { color: #77728F; font-size: 11px; }
+QPushButton#networkStatsRefresh {
+    background: #E5DEFF;
+    border: 1px solid #D0C5F5;
+    padding: 4px 10px;
+    min-height: 14px;
+}
+QPushButton#networkStatsRefresh:hover { background: #C4B5FD; }
+
+/* FloofyChain burn & live mempool panels */
+QWidget#burnPage, QWidget#mempoolFullPage { background: #F3F7FF; }
+QLabel#burnPageHeading, QLabel#mempoolPageHeading {
+    color: #55488D; font-size: 16px; font-weight: bold;
+}
+QLabel#mempoolCompactHeading { color: #55488D; font-size: 14px; font-weight: bold; }
+QFrame#burnPageCard, QWidget#mempoolCompact {
+    background: #FDFBFF; border: 1px solid #DCD6FF; border-radius: 13px;
+}
+QFrame#mempoolMetricCard { background: #F5F0FF; border: 1px solid #DCD6FF; border-radius: 10px; }
+QLabel#mempoolMetricCaption { color: #6A6490; font-size: 11px; }
+QLabel#mempoolMetricNumber { color: #35324E; font-size: 13px; font-weight: bold; }
+QLabel#mempoolLiveBadge {
+    background: #DCD6FF; color: #6254AA;
+    border: 1px solid #C6B8F5; border-radius: 8px; padding: 3px 7px;
+}
+QPushButton#burnSubmitButton { background: #8B80D6; color: #FFFFFF; border-color: #756AC5; }
+QPushButton#burnSubmitButton:hover { background: #756AC5; }
+QLabel#burnPageNotice, QLabel#burnPageResult,
+QLabel#mempoolStatus, QLabel#mempoolDetails { color: #554F72; }
+QTableWidget#mempoolTable { background: #FFFFFF; alternate-background-color: #F7F4FF; border: 1px solid #DDD5F2; }
+
+
+/* Compact Overview: keep the detailed experience on dedicated pages. */
+QWidget#OverviewPage QLabel { font-size: 11px; }
+QWidget#OverviewPage QFrame#frame,
+QWidget#OverviewPage QFrame#frame_2 {
+    border-radius: 9px;
+    padding: 0;
+}
+QWidget#OverviewPage QLabel#label_5,
+QWidget#OverviewPage QLabel#label_4 {
+    font-size: 12px;
+    font-weight: bold;
+    color: #514A80;
+}
+QWidget#OverviewPage QLabel#label_tip_header,
+QWidget#OverviewPage QLabel#label_tip {
+    font-size: 10px;
+    color: #6A648B;
+}
+QWidget#OverviewPage QLabel#labelBalance,
+QWidget#OverviewPage QLabel#labelUnconfirmed,
+QWidget#OverviewPage QLabel#labelImmature,
+QWidget#OverviewPage QLabel#labelTotal,
+QWidget#OverviewPage QLabel#labelWatchTotal {
+    font-size: 11px;
+    font-weight: bold;
+}
+QWidget#OverviewPage QListView#listTransactions {
+    border: 0;
+    border-radius: 5px;
+    font-size: 10px;
+}
+QWidget#OverviewPage QLabel#networkStatsTitle {
+    font-size: 11px;
+    font-weight: bold;
+}
+QWidget#OverviewPage QLabel#networkStatsAmount {
+    font-size: 12px;
+    font-weight: bold;
+}
+QWidget#OverviewPage QLabel#networkStatsStatus {
+    font-size: 10px;
+}
+QWidget#OverviewPage QFrame#networkStatsCard {
+    border-radius: 8px;
+    padding: 0;
+}
+QWidget#OverviewPage QPushButton#networkStatsRefresh {
+    font-size: 10px;
+    min-height: 0;
+    padding: 1px 7px;
+}
+QWidget#OverviewPage QWidget#mempoolCompact {
+    border-radius: 9px;
+}
+QWidget#mempoolCompact QLabel#mempoolCompactHeading,
+QWidget#mempoolCompact QLabel#mempoolMetricNumber {
+    font-size: 11px;
+    font-weight: bold;
+}
+QWidget#mempoolCompact QLabel#mempoolMetricCaption,
+QWidget#mempoolCompact QLabel#mempoolStatus {
+    font-size: 10px;
+}
+QWidget#mempoolCompact QFrame#mempoolMetricCard {
+    border-radius: 7px;
+    padding: 0;
+}
+QWidget#mempoolCompact QPushButton#mempoolExpandButton {
+    font-size: 10px;
+    min-height: 0;
+    padding: 2px 7px;
+}
+QWidget#mempoolCompact QTableWidget#mempoolTable {
+    font-size: 10px;
+}
+
+
+/* Next block reward: keep the third network card as compact as the others. */
+QWidget#OverviewPage QLabel#networkNextRewardHeight {
+    color: #77728F;
+    font-size: 10px;
+}
+
+
+/* On-demand confirmed address-rank card: matching compact Overview palette. */
+QWidget#OverviewPage QLabel#networkRichListDetails {
+    color: #77728F;
+    font-size: 10px;
+}
+QWidget#OverviewPage QPushButton#networkRichListRefresh {
+    background: #E5DEFF;
+    border: 1px solid #D0C5F5;
+    color: #544B81;
+    padding: 1px 6px;
+    min-height: 0;
+    font-size: 10px;
+    border-radius: 6px;
+}
+QWidget#OverviewPage QPushButton#networkRichListRefresh:hover {
+    background: #C4B5FD;
+}
+
+/* Compact mining details below the deterministic next-block subsidy. */
+QWidget#OverviewPage QLabel#networkNextMiningType {
+    color: #544A85;
+    font-size: 10px;
+    font-weight: bold;
+}
+QWidget#OverviewPage QLabel#networkNextMiningDifficulty {
+    color: #625C85;
+    font-size: 10px;
+}
+QWidget#OverviewPage QLabel#networkNextMiningBalance {
+    color: #77728F;
+    font-size: 9px;
+}
+
+
+/* Dense GUI layouts: reduce empty space without removing functionality.
+   All selectors are Qt 5 QSS selectors (no unsupported CSS features). */
+QMenu::item { padding: 4px 13px; }
+QGroupBox::title { left: 8px; padding: 0 4px; }
+QTabBar::tab { min-height: 15px; }
+QCheckBox, QRadioButton { spacing: 4px; }
+QHeaderView::section { padding: 4px; }
+QWidget#OverviewPage QFrame#networkRewardStrip {
+    background: #F5F0FF;
+    border: 1px solid #DCD6FF;
+    border-radius: 7px;
+}
+QWidget#OverviewPage QFrame#networkRewardStrip QLabel {
+    font-size: 10px;
+}
+QWidget#OverviewPage QFrame#networkRewardStrip QLabel#networkStatsAmount {
+    font-size: 12px;
+    font-weight: bold;
+}
+QWidget#OverviewPage QFrame#networkRewardStrip QLabel#networkNextMiningBalance {
+    font-size: 9px;
+}
+QWidget#OverviewPage QLabel#label_tip {
+    font-size: 10px;
+    color: #6A648B;
+}
+QWidget#mempoolCompact QLabel#mempoolLiveBadge {
+    font-size: 9px;
+    padding: 1px 5px;
+}
+QWidget#mempoolCompact QLabel#mempoolMetricCaption,
+QWidget#mempoolCompact QLabel#mempoolMetricNumber {
+    font-size: 10px;
+}
+QWidget#mempoolCompact QPushButton#mempoolExpandButton {
+    padding: 1px 5px;
+    min-height: 15px;
+}
+QWidget#burnPage QLabel#burnPageIntro, QWidget#burnPage QLabel#burnFeeNotice {
+    font-size: 11px;
+}
+QWidget#burnPage QLabel#burnPageNotice,
+QWidget#burnPage QLabel#burnPageResult {
+    font-size: 11px;
+}
+QFrame#burnPageCard { border-radius: 8px; }
+
+
+/* One cohesive Overview dashboard, not independent full-window ribbons. */
+QFrame#floofyOverviewDashboard {
+    background: #FDFBFF;
+    border: 1px solid #D9D1F2;
+    border-radius: 14px;
+}
+QLabel#floofyOverviewTitle {
+    color: #55488D;
+    font-size: 15px;
+    font-weight: bold;
+    background: transparent;
+}
+QLabel#floofyOverviewSubtitle {
+    color: #8076A0;
+    font-size: 11px;
+    background: transparent;
+}
+QFrame#floofyOverviewDashboard QFrame#frame,
+QFrame#floofyOverviewDashboard QFrame#frame_2 {
+    background: #F8F6FF;
+    border: 1px solid #E3DEFA;
+    border-radius: 9px;
+}
+QFrame#floofyOverviewDashboard QFrame#networkStatsPanel {
+    background: transparent;
+    border: none;
+}
+QFrame#floofyOverviewDashboard QWidget#mempoolCompact {
+    background: #F5F0FF;
+    border: 1px solid #DCD6FF;
+    border-radius: 9px;
+}
+
+
+/* Comfortable unified dashboard in the smaller, resizable main window. */
+QScrollArea#floofyOverviewScroll {
+    background: #F3F7FF;
+    border: 0;
+}
+QWidget#floofyOverviewCanvas {
+    background: #F3F7FF;
+}
+QFrame#floofyOverviewDashboard {
+    border-radius: 13px;
+}
+QFrame#floofyOverviewDashboard QLabel#floofyOverviewTitle {
+    font-size: 16px;
+}
+QFrame#floofyOverviewDashboard QFrame#networkStatsCard {
+    border-radius: 9px;
+}
+QFrame#floofyOverviewDashboard QLabel#networkStatsTitle {
+    font-size: 12px;
+}
+QFrame#floofyOverviewDashboard QLabel#networkStatsAmount {
+    font-size: 13px;
+}
+QFrame#floofyOverviewDashboard QLabel#networkNextMiningType,
+QFrame#floofyOverviewDashboard QLabel#networkNextMiningDifficulty,
+QFrame#floofyOverviewDashboard QLabel#networkNextMiningBalance {
+    font-size: 11px;
+}
+QFrame#floofyOverviewDashboard QLabel#mempoolMetricNumber {
+    font-size: 12px;
+}
+QFrame#floofyOverviewDashboard QLabel#mempoolMetricCaption {
+    font-size: 11px;
+}
+
+
+/* Full-viewport Overview: colour and framing extend into the entire
+   available wallet area in normal, resized and maximised windows. */
+QScrollArea#floofyOverviewScroll,
+QScrollArea#floofyOverviewScroll > QWidget,
+QFrame#floofyOverviewDashboard {
+    background-color: #FDFBFF;
+}
+QScrollArea#floofyOverviewScroll {
+    border: 0;
+    padding: 0;
+}
+QFrame#floofyOverviewDashboard {
+    border: 0;
+    border-radius: 0;
+}

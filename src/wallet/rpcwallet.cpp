@@ -17,6 +17,8 @@
 #include "policy/rbf.h"
 #include "rpc/server.h"
 #include "script/sign.h"
+#include "script/ismine.h"
+#include "coins.h"
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -28,6 +30,11 @@
 #include <script/standard.h>
 
 #include <stdint.h>
+#include <atomic>
+#include <limits>
+#include <memory>
+#include <map>
+#include <set>
 
 #include <boost/assign/list_of.hpp>
 
@@ -643,6 +650,168 @@ static UniValue burn(const JSONRPCRequest& request)
 }
 
 
+
+/**
+ * Read-only, wallet-aware confirmed UTXO address ranking.
+ *
+ * This intentionally does not claim a wallet identity has one on-chain rank:
+ * it returns the rank of the wallet's highest funded spendable address.
+ * We do not require an explorer, address index or any private key export.
+ *
+ * NOTE: A complete UTXO scan can take some time, so clients should request
+ * this only explicitly (not at every block or on each window open).
+ */
+UniValue getwalletrichlistrank(const JSONRPCRequest& request)
+{
+    if (!EnsureWalletIsAvailable(request.fHelp))
+        return NullUniValue;
+
+    if (request.fHelp || request.params.size() != 0)
+        throw runtime_error(
+            "getwalletrichlistrank\n"
+            "\nFind the address-rich-list rank of the richest spendable address\n"
+            "in this wallet, among all funded standard addresses in the UTXO set.\n"
+            "This is NOT a rank of one person or combined wallet holdings.\n"
+            "The calculation scans the node's entire confirmed UTXO set and\n"
+            "may take significant time. Use on demand rather than polling.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"rank\": n or null,          (numeric) Equal balances share a rank\n"
+            "  \"address\": \"str\" or null,  (string) The wallet's richest address\n"
+            "  \"balance\": n,               (numeric) Confirmed UTXO amount at this address\n"
+            "  \"wallet_balance\": n,        (numeric) All spendable wallet-address UTXOs\n"
+            "  \"wallet_addresses\": n,      (numeric) Number of funded wallet addresses\n"
+            "  \"total_addresses\": n,       (numeric) Number of funded ranked addresses\n"
+            "  \"height\": n,                (numeric) UTXO snapshot height\n"
+            "  \"bestblock\": \"hash\"         (string) UTXO snapshot block hash\n"
+            "}\n"
+            "\nOnly outputs with a standard, extractable destination are ranked.\n"
+            "Unconfirmed transactions, unspendable outputs and nonstandard\n"
+            "scripts are excluded. Explorer rankings may use other rules.\n"
+            + HelpExampleCli("getwalletrichlistrank", "")
+            + HelpExampleRpc("getwalletrichlistrank", ""));
+
+    if (IsInitialBlockDownload())
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD,
+                           "Synchronise the blockchain before checking rich-list rank");
+
+    // Prevent two concurrent full scans from exhausting RAM/IO.
+    static std::atomic<bool> rankScanRunning(false);
+    bool expected = false;
+    if (!rankScanRunning.compare_exchange_strong(expected, true))
+        throw JSONRPCError(RPC_MISC_ERROR, "A rich-list scan is already running");
+    struct ResetScanFlag {
+        std::atomic<bool>& flag;
+        explicit ResetScanFlag(std::atomic<bool>& f) : flag(f) {}
+        ~ResetScanFlag() { flag.store(false); }
+    } resetScanFlag(rankScanRunning);
+
+    // Identify only the wallet's own spendable addresses; change addresses
+    // already appear in GetAddressBalances(). Do not retain the wallet lock
+    // while reading the whole chainstate.
+    std::set<CTxDestination> ownedAddresses;
+    {
+        LOCK2(cs_main, pwalletMain->cs_wallet);
+        const std::map<CTxDestination, CAmount> walletAddresses =
+            pwalletMain->GetAddressBalances();
+        for (const auto& address : walletAddresses) {
+            if ((IsMine(*pwalletMain, address.first) & ISMINE_SPENDABLE) != 0)
+                ownedAddresses.insert(address.first);
+        }
+    }
+
+    // Like gettxoutsetinfo: take an on-disk snapshot of the confirmed
+    // chainstate before opening the LevelDB cursor.
+    FlushStateToDisk();
+    std::unique_ptr<CCoinsViewCursor> cursor(pcoinsTip->Cursor());
+    if (!cursor)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "UTXO cursor unavailable");
+
+    const uint256 hashBlock = cursor->GetBestBlock();
+    int snapshotHeight = -1;
+    {
+        LOCK(cs_main);
+        const auto found = mapBlockIndex.find(hashBlock);
+        if (found == mapBlockIndex.end())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "UTXO snapshot tip not found");
+        snapshotHeight = found->second->nHeight;
+    }
+
+    // Account for outputs by standard destination. An explicit safety limit
+    // prevents a low-memory GUI node from exhausting RAM on a huge chain.
+    const size_t maxRankedAddresses = 1000000;
+    std::map<CTxDestination, CAmount> balances;
+    while (cursor->Valid()) {
+        uint256 txid;
+        CCoins coins;
+        if (!cursor->GetKey(txid) || !cursor->GetValue(coins))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to read UTXO record");
+
+        for (const CTxOut& output : coins.vout) {
+            if (output.IsNull() || output.nValue <= 0)
+                continue;
+            CTxDestination destination;
+            if (!ExtractDestination(output.scriptPubKey, destination))
+                continue;
+
+            auto it = balances.find(destination);
+            if (it == balances.end()) {
+                if (balances.size() >= maxRankedAddresses)
+                    throw JSONRPCError(RPC_MISC_ERROR,
+                        "Too many addresses for an in-memory rich-list scan");
+                balances.emplace(destination, output.nValue);
+            } else {
+                if (it->second > std::numeric_limits<CAmount>::max() - output.nValue)
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Address UTXO amount overflow");
+                it->second += output.nValue;
+            }
+        }
+        cursor->Next();
+    }
+
+    CAmount richestBalance = 0;
+    CAmount walletSum = 0;
+    std::string richestAddress;
+    int64_t fundedWalletAddresses = 0;
+
+    for (const CTxDestination& destination : ownedAddresses) {
+        const auto it = balances.find(destination);
+        if (it == balances.end() || it->second <= 0)
+            continue;
+        ++fundedWalletAddresses;
+        if (walletSum > std::numeric_limits<CAmount>::max() - it->second)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet UTXO amount overflow");
+        walletSum += it->second;
+        const std::string address = CBitcoinAddress(destination).ToString();
+        if (it->second > richestBalance ||
+            (it->second == richestBalance &&
+             (richestAddress.empty() || address < richestAddress))) {
+            richestBalance = it->second;
+            richestAddress = address;
+        }
+    }
+
+    UniValue result(UniValue::VOBJ);
+    if (!richestAddress.empty()) {
+        int64_t rank = 1;
+        for (const auto& entry : balances) {
+            if (entry.second > richestBalance)
+                ++rank;
+        }
+        result.pushKV("rank", rank);
+        result.pushKV("address", richestAddress);
+    } else {
+        result.pushKV("rank", NullUniValue);
+        result.pushKV("address", NullUniValue);
+    }
+    result.pushKV("balance", ValueFromAmount(richestBalance));
+    result.pushKV("wallet_balance", ValueFromAmount(walletSum));
+    result.pushKV("wallet_addresses", fundedWalletAddresses);
+    result.pushKV("total_addresses", static_cast<int64_t>(balances.size()));
+    result.pushKV("height", snapshotHeight);
+    result.pushKV("bestblock", hashBlock.GetHex());
+    return result;
+}
 
 UniValue listaddressgroupings(const JSONRPCRequest& request)
 {
@@ -3460,6 +3629,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "importpubkey",             &importpubkey,             true,         {"pubkey","label","rescan", "height"} },
     { "wallet",             "keypoolrefill",            &keypoolrefill,            true,         {"newsize"} },
     { "wallet",             "listaccounts",             &listaccounts,             false,        {"minconf","include_watchonly"} },
+    { "wallet",             "getwalletrichlistrank",    &getwalletrichlistrank,    true,         {} },
     { "wallet",             "listaddressgroupings",     &listaddressgroupings,     false,        {} },
     { "wallet",             "listlockunspent",          &listlockunspent,          false,        {} },
     { "wallet",             "listreceivedbyaccount",    &listreceivedbyaccount,    false,        {"minconf","include_empty","include_watchonly"} },

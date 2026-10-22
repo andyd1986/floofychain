@@ -9,6 +9,7 @@
 #include "amount.h"
 
 #include <QWidget>
+#include <QDateTime>
 #include <memory>
 
 class ClientModel;
@@ -16,6 +17,10 @@ class TransactionFilterProxy;
 class TxViewDelegate;
 class PlatformStyle;
 class WalletModel;
+class QThread;
+class QLabel;
+class QPushButton;
+class MempoolPage;
 
 namespace Ui {
     class OverviewPage;
@@ -60,6 +65,22 @@ private:
 
     TxViewDelegate *txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
+    QThread* networkStatsWorker;
+    QLabel* networkSupplyLabel;
+    QLabel* networkBurnedLabel;
+    QLabel* nextRewardLabel;
+    QLabel* nextRewardHeightLabel;
+    QLabel* nextMiningTypeLabel;
+    QLabel* nextNativeDifficultyLabel;
+    QLabel* nextAuxpowDifficultyLabel;
+    QLabel* nextMiningBalanceLabel;
+    QLabel* networkStatusLabel;
+    MempoolPage* compactMempoolPage;
+    QThread* richListWorker;
+    QPushButton* richListRefreshButton;
+    QLabel* richListRankLabel;
+    QLabel* richListDetailsLabel;
+    qint64 lastNetworkStatsRefresh;
 
 private Q_SLOTS:
     void updateDisplayUnit();
@@ -67,6 +88,17 @@ private Q_SLOTS:
     void updateAlerts(const QString &warnings);
     void updateWatchOnlyLabels(bool showWatchOnly);
     void handleOutOfSyncWarningClicks();
+    void refreshNetworkStats();
+    void updateNextReward();
+    void onNetworkBlockChanged(int count, const QDateTime& blockDate, double verificationProgress, bool header);
+    void networkStatsReady(const QString& supply, const QString& burned, const QString& detail);
+    void networkStatsError(const QString& reason);
+    void networkStatsFinished();
+    void refreshRichListRank();
+    void richListReady(const QString& ranking, const QString& details,
+                       const QString& tooltip);
+    void richListError(const QString& message);
+    void richListFinished();
 };
 
 #endif // BITCOIN_QT_OVERVIEWPAGE_H

@@ -45,6 +45,9 @@
 
 #include <QApplication>
 #include <QDebug>
+#include <QFile>
+#include <QPalette>
+#include <QColor>
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QMessageBox>
@@ -311,6 +314,24 @@ BitcoinApplication::BitcoinApplication():
     returnValue(0)
 {
     setQuitOnLastWindowClosed(false);
+
+    // The GUI-only pastel theme is embedded in the Qt resource bundle, so it
+    // works in both static Windows and Linux builds without external files.
+    QPalette pastelPalette = palette();
+    pastelPalette.setColor(QPalette::Window, QColor("#F3F7FF"));
+    pastelPalette.setColor(QPalette::Base, QColor("#FFFFFF"));
+    pastelPalette.setColor(QPalette::AlternateBase, QColor("#F5F0FF"));
+    pastelPalette.setColor(QPalette::Text, QColor("#35324E"));
+    pastelPalette.setColor(QPalette::WindowText, QColor("#35324E"));
+    pastelPalette.setColor(QPalette::Button, QColor("#E5DEFF"));
+    pastelPalette.setColor(QPalette::ButtonText, QColor("#35324E"));
+    pastelPalette.setColor(QPalette::Highlight, QColor("#8B80D6"));
+    pastelPalette.setColor(QPalette::HighlightedText, Qt::white);
+    setPalette(pastelPalette);
+
+    QFile themeFile(":/styles/floofy-pastel");
+    if (themeFile.open(QIODevice::ReadOnly | QIODevice::Text))
+        setStyleSheet(QString::fromUtf8(themeFile.readAll()));
 
     // UI per-platform customization
     // This must be done inside the BitcoinApplication constructor, or after it, because

@@ -13,6 +13,8 @@
 #include "importkeysdialog.h"
 #include "optionsmodel.h"
 #include "overviewpage.h"
+#include "burnpage.h"
+#include "mempoolpage.h"
 #include "platformstyle.h"
 #include "receivecoinsdialog.h"
 #include "sendcoinsdialog.h"
@@ -40,6 +42,8 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
 {
     // Create tabs
     overviewPage = new OverviewPage(platformStyle);
+    burnPage = new BurnPage(this);
+    mempoolPage = new MempoolPage(false, this);
 
     transactionsPage = new QWidget(this);
     QVBoxLayout *vbox = new QVBoxLayout();
@@ -63,6 +67,8 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
 
     addWidget(overviewPage);
+    addWidget(burnPage);
+    addWidget(mempoolPage);
     addWidget(transactionsPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
@@ -115,6 +121,8 @@ void WalletView::setClientModel(ClientModel *_clientModel)
     this->clientModel = _clientModel;
 
     overviewPage->setClientModel(_clientModel);
+    burnPage->setClientModel(_clientModel);
+    mempoolPage->setClientModel(_clientModel);
     sendCoinsPage->setClientModel(_clientModel);
 }
 
@@ -125,6 +133,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     // Put transaction list in tabs
     transactionView->setModel(_walletModel);
     overviewPage->setWalletModel(_walletModel);
+    burnPage->setWalletModel(_walletModel);
     receiveCoinsPage->setModel(_walletModel);
     sendCoinsPage->setModel(_walletModel);
     usedReceivingAddressesPage->setModel(_walletModel->getAddressTableModel());
@@ -177,6 +186,16 @@ void WalletView::processNewTransaction(const QModelIndex& parent, int start, int
 void WalletView::gotoOverviewPage()
 {
     setCurrentWidget(overviewPage);
+}
+
+void WalletView::gotoBurnPage()
+{
+    setCurrentWidget(burnPage);
+}
+
+void WalletView::gotoMempoolPage()
+{
+    setCurrentWidget(mempoolPage);
 }
 
 void WalletView::gotoHistoryPage()
