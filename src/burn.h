@@ -3,6 +3,7 @@
 #define FLOOFY_BURN_H
 
 #include "amount.h"
+#include "consensus/params.h"
 #include "primitives/transaction.h"
 #include "script/script.h"
 
@@ -11,7 +12,7 @@
 #include <vector>
 
 // Versioned FloofyChain voluntary burn protocol.
-// No consensus-rule changes are required.
+// Canonical burns are subject to a height-activated network minimum.
 
 static const std::string FLOOF_BURN_TAG = "FLOOF:BURN:1";
 static const size_t FLOOF_BURN_MAX_MESSAGE = 48;
@@ -107,6 +108,33 @@ static inline bool ParseFloofyBurn(
     }
 
     return true;
+}
+
+// FLOOF_MIN_BURN_250000: shared consensus validation.
+static inline bool FloofyMinimumBurnActive(const Consensus::Params& params, int height)
+{
+    return params.fEnforceMinBurn &&
+           height >= static_cast<int>(params.nMinBurnActivationHeight);
+}
+
+static inline bool FloofyBurnAmountBelowMinimum(CAmount amount, const Consensus::Params& params, int height)
+{
+    return FloofyMinimumBurnActive(params, height) &&
+           amount < params.nMinimumBurnAmount;
+}
+
+static inline bool HasFloofyBurnBelowMinimum(const CTransaction& tx, const Consensus::Params& params, int height)
+{
+    if (!FloofyMinimumBurnActive(params, height))
+        return false;
+
+    for (const CTxOut& output : tx.vout) {
+        std::string message;
+        if (ParseFloofyBurn(output, message) &&
+            FloofyBurnAmountBelowMinimum(output.nValue, params, height))
+            return true;
+    }
+    return false;
 }
 
 #endif // FLOOFY_BURN_H

@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "burnpage.h"
+#include "burn.h" // FLOOF_MIN_BURN_250000
+#include "chainparams.h"
 
 #include "bitcoinamountfield.h"
 #include "bitcoinunits.h"
@@ -71,6 +73,7 @@ BurnPage::BurnPage(QWidget* parent)
       messageField(nullptr),
       acknowledgeBox(nullptr),
       availableLabel(nullptr),
+      minimumLabel(nullptr),
       previewLabel(nullptr),
       resultLabel(nullptr),
       previewButton(nullptr),
@@ -115,6 +118,10 @@ BurnPage::BurnPage(QWidget* parent)
     amountField->setDisplayUnit(BitcoinUnits::BTC);
     amountRow->addWidget(amountField, 1);
     form->addLayout(amountRow);
+
+    minimumLabel = new QLabel(tr("Minimum burn: checking network height"), card);
+    minimumLabel->setObjectName("burnMinimumLabel");
+    form->addWidget(minimumLabel);
 
     QLabel* messageTitle = new QLabel(tr("Public message (optional)"), card);
     QHBoxLayout* messageRow = new QHBoxLayout();
@@ -188,6 +195,7 @@ BurnPage::~BurnPage()
 void BurnPage::setClientModel(ClientModel* model)
 {
     clientModel = model;
+    updateAvailable();
 }
 
 void BurnPage::setWalletModel(WalletModel* model)
@@ -214,6 +222,19 @@ void BurnPage::updateAvailable()
     availableLabel->setText(walletModel
         ? tr("Spendable balance: %1").arg(formatAmount(walletModel->getBalance()))
         : tr("No wallet loaded"));
+
+    const int nextHeight = clientModel ? clientModel->getNumBlocks() + 1 : 0;
+    const Consensus::Params& consensus = Params().GetConsensus(nextHeight);
+    if (FloofyMinimumBurnActive(consensus, nextHeight)) {
+        minimumLabel->setText(tr("Minimum burn: %1")
+            .arg(formatAmount(consensus.nMinimumBurnAmount)));
+    } else if (consensus.fEnforceMinBurn) {
+        minimumLabel->setText(tr("Minimum burn: %1 (activates at block %2)")
+            .arg(formatAmount(consensus.nMinimumBurnAmount))
+            .arg(static_cast<int>(consensus.nMinBurnActivationHeight)));
+    } else {
+        minimumLabel->setText(tr("No burn minimum on this network."));
+    }
 }
 
 void BurnPage::previewClicked()
@@ -260,6 +281,16 @@ void BurnPage::beginPreview(bool commitAfterConfirmation)
     }
 
     const CAmount amount = amountField->value();
+    // FLOOF_MIN_BURN_250000: display friendly GUI validation before unlock.
+    const int nextHeight = clientModel ? clientModel->getNumBlocks() + 1 : 0;
+    const Consensus::Params& burnConsensus = Params().GetConsensus(nextHeight);
+    if (FloofyBurnAmountBelowMinimum(amount, burnConsensus, nextHeight)) {
+        QMessageBox::warning(this, tr("Minimum burn amount not met"),
+            tr("Minimum burn amount not met. You must burn at least %1.")
+                .arg(formatAmount(burnConsensus.nMinimumBurnAmount)));
+        updateAvailable();
+        return;
+    }
     if (walletModel->getBalance() < amount) {
         QMessageBox::warning(this, tr("Insufficient funds"),
                              tr("The burn amount exceeds your spendable balance. "
@@ -339,14 +370,26 @@ void BurnPage::workerFinished()
             return;
         }
 
-        const QString text = tr("Amount permanently burned: %1\n"
-                                "Estimated fee: %2\n"
-                                "Estimated total wallet cost: %3\n"
-                                "Message: %4")
-            .arg(formatAmount(AmountFromValue(amount)))
-            .arg(formatAmount(AmountFromValue(fee)))
-            .arg(formatAmount(AmountFromValue(walletCost)))
-            .arg(messageField->text().isEmpty() ? tr("(none)") : messageField->text());
+        QString text;
+        try {
+            text = tr("Amount permanently burned: %1\n"
+                      "Estimated fee: %2\n"
+                      "Estimated total wallet cost: %3\n"
+                      "Message: %4")
+                .arg(formatAmount(AmountFromValue(amount)))
+                .arg(formatAmount(AmountFromValue(fee)))
+                .arg(formatAmount(AmountFromValue(walletCost)))
+                .arg(messageField->text().isEmpty() ? tr("(none)") : messageField->text());
+        } catch (const std::exception& ex) {
+            previewLabel->setText(tr("Unable to display burn preview."));
+            QMessageBox::warning(this, tr("Burn preview error"), QString::fromUtf8(ex.what()));
+            finishOperation();
+            return;
+        } catch (...) {
+            previewLabel->setText(tr("Unable to display burn preview."));
+            finishOperation();
+            return;
+        }
         previewLabel->setText(text);
 
         if (!commitRequested) {

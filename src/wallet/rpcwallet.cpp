@@ -466,6 +466,7 @@ static UniValue burn(const JSONRPCRequest& request)
             "4. preview                  (boolean, default=false)\n"
             "\nThe exact amount is burned. Fees are additional.\n"
             "subtractfeefromamount=true is not supported.\n"
+            "Canonical burn minimum: 1,000 FLOOF from mainnet block 250000.\n"
             "Messages are limited to 48 printable ASCII bytes.\n"
         );
     }
@@ -521,6 +522,15 @@ static UniValue burn(const JSONRPCRequest& request)
     }
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    // FLOOF_MIN_BURN_250000: wallet RPC rejects burns below next-block rule.
+    const int nextHeight = chainActive.Height() + 1;
+    const Consensus::Params& burnConsensus = Params().GetConsensus(nextHeight);
+    if (FloofyBurnAmountBelowMinimum(amount, burnConsensus, nextHeight)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            strprintf("Minimum burn amount not met: %s FLOOF required",
+                      FormatMoney(burnConsensus.nMinimumBurnAmount)));
+    }
 
     EnsureWalletIsUnlocked();
 

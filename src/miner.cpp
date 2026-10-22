@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "miner.h"
+#include "burn.h" // FLOOF_MIN_BURN_250000
 
 #include "amount.h"
 #include "chain.h"
@@ -278,6 +279,8 @@ bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& packa
     BOOST_FOREACH (const CTxMemPool::txiter it, package) {
         if (!IsFinalTx(it->GetTx(), nHeight, nLockTimeCutoff))
             return false;
+        if (HasFloofyBurnBelowMinimum(it->GetTx(), chainparams.GetConsensus(nHeight), nHeight))
+            return false;
         if (!fIncludeWitness && it->GetTx().HasWitness())
             return false;
         if (fNeedSizeAccounting) {
@@ -338,6 +341,9 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     // This can be removed once MTP is always enforced
     // as long as reorgs keep the mempool consistent.
     if (!IsFinalTx(iter->GetTx(), nHeight, nLockTimeCutoff))
+        return false;
+    // FLOOF_MIN_BURN_250000: exclude pre-fork mempool entries at boundary.
+    if (HasFloofyBurnBelowMinimum(iter->GetTx(), chainparams.GetConsensus(nHeight), nHeight))
         return false;
 
     return true;

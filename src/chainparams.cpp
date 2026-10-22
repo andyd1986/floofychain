@@ -134,6 +134,10 @@ public:
         // Proposed single mainnet hard fork: strict AuxPoW joins all other
         // new consensus rules at height 245000, not the previous 300000.
         consensus.nAuxpowStrictValidationHeight = 245000;
+        // FLOOF_MIN_BURN_250000: do not alter nHeightEffective (DAA anchor).
+        consensus.fEnforceMinBurn = true;
+        consensus.nMinimumBurnAmount = 1000 * COIN;
+        consensus.nMinBurnActivationHeight = 250000;
 	consensus.nHeightEffective = 0;
 
         // Blocks 145000 - 371336 are Digishield without AuxPoW
@@ -424,6 +428,10 @@ public:
         consensus.fAllowLegacyBlocks = true;
         consensus.fAuxpowLegacyRule = true;
         consensus.nAuxpowStrictValidationHeight = 30;
+        // FLOOF_MIN_BURN_250000: regtest activates at block 80.
+        consensus.fEnforceMinBurn = true;
+        consensus.nMinimumBurnAmount = 1000 * COIN;
+        consensus.nMinBurnActivationHeight = 80;
 
         // Floofy parameters
         consensus.fSimplifiedRewards = true;
