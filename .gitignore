@@ -169,3 +169,17 @@ venv/
 # Locally generated balancing study output (keep test scripts)
 /floofy_balancing_*_blocks.csv
 # END FLOOFYCHAIN GENERATED FILES
+
+# Host-specific files recreated by ./autogen.sh and ./configure.
+# Keep the matching *.in source templates under Git instead.
+/share/setup.nsi
+/share/qt/Info.plist
+/contrib/devtools/split-debug.sh
+
+# Libtool macros installed by autoreconf/libtoolize in build-aux/m4/.
+# Project-specific *.m4 macros remain tracked.
+/build-aux/m4/libtool.m4
+/build-aux/m4/ltoptions.m4
+/build-aux/m4/ltsugar.m4
+/build-aux/m4/ltversion.m4
+/build-aux/m4/lt~obsolete.m4

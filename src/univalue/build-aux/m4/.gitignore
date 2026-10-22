@@ -1,1 +1,3 @@
 /*.m4
+# Retain the C++ standard macro required by UniValue's configure.ac.
+!/ax_cxx_compile_stdcxx.m4

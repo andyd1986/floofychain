@@ -1,4 +1,4 @@
-Floofy Core 0.14.2
+Floofy Core 3.0.3
 =====================
 
 Intro
