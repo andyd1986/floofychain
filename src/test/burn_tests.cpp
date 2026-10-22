@@ -1,5 +1,7 @@
 
 #include "burn.h"
+#include "chainparams.h" // FLOOF_MIN_BURN_250000
+#include "chainparamsbase.h"
 #include "amount.h"
 #include "base58.h"
 #include "coins.h"
@@ -424,6 +426,54 @@ BOOST_AUTO_TEST_CASE(burn_invalid_empty_suffix)
     );
 
     BOOST_CHECK(message.empty());
+}
+
+// FLOOF_MIN_BURN_250000: height boundary and burn protocol tests.
+BOOST_AUTO_TEST_CASE(min_burn_activation_mainnet_250000)
+{
+    const Consensus::Params& before = Params(CBaseChainParams::MAIN).GetConsensus(249999);
+    const Consensus::Params& at = Params(CBaseChainParams::MAIN).GetConsensus(250000);
+    const Consensus::Params& after = Params(CBaseChainParams::MAIN).GetConsensus(250001);
+    BOOST_CHECK(!FloofyMinimumBurnActive(before, 249999));
+    BOOST_CHECK(FloofyMinimumBurnActive(at, 250000));
+    BOOST_CHECK(FloofyMinimumBurnActive(after, 250001));
+    BOOST_CHECK_EQUAL(at.nHeightEffective, 245000U);
+    BOOST_CHECK_EQUAL(at.nMinimumBurnAmount, 1000 * COIN);
+
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vout.push_back(CTxOut(999 * COIN, FloofyBurnScript("below")));
+    BOOST_CHECK(!HasFloofyBurnBelowMinimum(CTransaction(tx), before, 249999));
+    BOOST_CHECK(HasFloofyBurnBelowMinimum(CTransaction(tx), at, 250000));
+    BOOST_CHECK(HasFloofyBurnBelowMinimum(CTransaction(tx), after, 250001));
+    tx.vout[0].nValue = 1000 * COIN;
+    BOOST_CHECK(!HasFloofyBurnBelowMinimum(CTransaction(tx), at, 250000));
+    tx.vout[0].nValue = 1001 * COIN;
+    BOOST_CHECK(!HasFloofyBurnBelowMinimum(CTransaction(tx), at, 250000));
+}
+
+BOOST_AUTO_TEST_CASE(min_burn_regtest_boundary_80)
+{
+    const Consensus::Params& before = Params(CBaseChainParams::REGTEST).GetConsensus(79);
+    const Consensus::Params& at = Params(CBaseChainParams::REGTEST).GetConsensus(80);
+    BOOST_CHECK(!FloofyMinimumBurnActive(before, 79));
+    BOOST_CHECK(FloofyMinimumBurnActive(at, 80));
+    BOOST_CHECK_EQUAL(at.nMinimumBurnAmount, 1000 * COIN);
+    BOOST_CHECK_EQUAL(at.nHeightEffective, 50U);
+}
+
+BOOST_AUTO_TEST_CASE(min_burn_multiburn_and_nonburn_unchanged)
+{
+    const Consensus::Params& at = Params(CBaseChainParams::MAIN).GetConsensus(250000);
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vout.push_back(CTxOut(1000 * COIN, FloofyBurnScript("valid")));
+    tx.vout.push_back(CTxOut(2000 * COIN, CScript() << OP_RETURN << ToByteVector(std::string("OTHER"))));
+    BOOST_CHECK(!HasFloofyBurnBelowMinimum(CTransaction(tx), at, 250000));
+    tx.vout.push_back(CTxOut(999 * COIN, FloofyBurnScript("small")));
+    BOOST_CHECK(HasFloofyBurnBelowMinimum(CTransaction(tx), at, 250000));
+    tx.vout[2].scriptPubKey = CScript() << OP_1;
+    BOOST_CHECK(!HasFloofyBurnBelowMinimum(CTransaction(tx), at, 250000));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

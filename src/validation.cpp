@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "validation.h"
+#include "burn.h" // FLOOF_MIN_BURN_250000
 #include "rewards.h"
 #include "arith_uint256.h"
 #include "chainparams.h"
@@ -634,6 +635,12 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
 
     if (!CheckTransaction(tx, state))
         return false; // state filled in by CheckTransaction
+
+    // FLOOF_MIN_BURN_250000: keep invalid next-block burns out of mempool.
+    const int nextHeight = chainActive.Height() + 1;
+    const Consensus::Params& burnConsensus = Params().GetConsensus(nextHeight);
+    if (HasFloofyBurnBelowMinimum(tx, burnConsensus, nextHeight))
+        return state.DoS(0, false, REJECT_INVALID, "bad-burn-below-minimum");
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
@@ -1827,6 +1834,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             return AbortNode(state, "Corrupt block found indicating potential hardware failure; shutting down");
         }
         return error("%s: Consensus::CheckBlock: %s", __func__, FormatStateMessage(state));
+    }
+
+    // FLOOF_MIN_BURN_250000: recheck cached blocks on connect and reorg.
+    for (const auto& tx : block.vtx) {
+        if (HasFloofyBurnBelowMinimum(*tx, consensus, pindex->nHeight))
+            return state.DoS(100, false, REJECT_INVALID, "bad-burn-below-minimum");
     }
 
     // verify that the view's current state corresponds to the previous block
@@ -3212,6 +3225,12 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, const CB
         if (!IsFinalTx(*tx, nHeight, nLockTimeCutoff)) {
             return state.DoS(10, false, REJECT_INVALID, "bad-txns-nonfinal", false, "non-final transaction");
         }
+    }
+
+    // FLOOF_MIN_BURN_250000: validate every canonical burn at block height.
+    for (const auto& tx : block.vtx) {
+        if (HasFloofyBurnBelowMinimum(*tx, consensusParams, nHeight))
+            return state.DoS(100, false, REJECT_INVALID, "bad-burn-below-minimum");
     }
 
     // Enforce rule that the coinbase starts with serialized block height

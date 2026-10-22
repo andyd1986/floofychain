@@ -8,6 +8,7 @@
 #define BITCOIN_CONSENSUS_PARAMS_H
 
 #include "uint256.h"
+#include "amount.h"
 #include <map>
 #include <string>
 
@@ -76,6 +77,11 @@ struct Params {
     bool fFloofyDualPowDifficulty = false;
     bool fPowAllowDigishieldMinDifficultyBlocks; // Allow minimum difficulty blocks where a retarget would normally occur
     bool fSimplifiedRewards; // Use block height derived rewards rather than previous block hash derived
+
+    // FLOOF_MIN_BURN_250000: protocol-level minimum; separate from DAA anchor.
+    bool fEnforceMinBurn = false;
+    CAmount nMinimumBurnAmount = 0;
+    uint32_t nMinBurnActivationHeight = 0;
 
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;

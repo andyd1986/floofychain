@@ -46,6 +46,7 @@ private:
     QLineEdit* messageField;
     QCheckBox* acknowledgeBox;
     QLabel* availableLabel;
+    QLabel* minimumLabel; // FLOOF_MIN_BURN_250000
     QLabel* previewLabel;
     QLabel* resultLabel;
     QPushButton* previewButton;
