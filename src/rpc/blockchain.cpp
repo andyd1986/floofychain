@@ -2435,6 +2435,194 @@ static UniValue listburntransactions(
 
 
 
+
+/**
+ * Independently verified leaderboard for LB1 burns.
+ *
+ * Two sequential historical passes avoid needing -txindex. First gather
+ * the relevant burn inputs, then resolve their prevouts from active-chain
+ * transaction outputs. Claiming an address in OP_RETURN is never sufficient.
+ * Entire-chain scanning is deliberately uncached pending an audited index.
+ */
+static UniValue getburnleaderboard(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error("getburnleaderboard (days)\\n"
+                                 "days: 0=all time, 7, or 30.\\n"
+                                 "Returns confirmed, verified LB1 address burns.\\n"
+                                 "Requires unpruned historical block data.");
+
+    int days = 0;
+    if (!request.params.empty()) days = request.params[0].get_int();
+    if (days != 0 && days != 7 && days != 30)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "days must be 0, 7 or 30");
+
+    // The global burn statistics use floofyBurnScanMutex. A leaderboard
+    // refresh must never reject getburnedtotal/Overview statistics.
+    static std::mutex leaderboardScanMutex;
+    static uint256 cachedTipHash;
+    static bool cacheReady = false;
+    static std::map<int, UniValue> cachedPeriods;
+    std::unique_lock<std::mutex> scanLock(leaderboardScanMutex, std::try_to_lock);
+    if (!scanLock.owns_lock())
+        throw JSONRPCError(RPC_MISC_ERROR, "Leaderboard scan already running");
+
+    // Avoid repeated full-chain scans for the same confirmed chain tip.
+    {
+        LOCK(cs_main);
+        if (cacheReady && chainActive.Tip() &&
+            cachedTipHash == chainActive.Tip()->GetBlockHash()) {
+            const auto found = cachedPeriods.find(days);
+            if (found != cachedPeriods.end()) return found->second;
+        }
+    }
+
+    std::vector<const CBlockIndex*> indexes;
+    uint256 tipHash;
+    int tipHeight;
+    int64_t cutoff = 0;
+    {
+        LOCK(cs_main);
+        tipHeight = chainActive.Height();
+        if (tipHeight < 0)
+            throw JSONRPCError(RPC_MISC_ERROR, "No chain tip");
+        tipHash = chainActive.Tip()->GetBlockHash();
+        const int64_t tipTime = chainActive.Tip()->GetBlockTime();
+        if (days) cutoff = tipTime - static_cast<int64_t>(days) * 86400;
+        indexes.reserve(tipHeight + 1);
+        for (int i = 0; i <= tipHeight; ++i) indexes.push_back(chainActive[i]);
+    }
+
+    struct BurnClaim {
+        std::string address;
+        std::string message;
+        CAmount amount;
+        uint256 txid;
+        int height;
+        int64_t time;
+        std::vector<COutPoint> inputs;
+    };
+    std::vector<BurnClaim> claims;
+    std::map<COutPoint, CScript> fundingScripts;
+    for (const CBlockIndex* index : indexes) {
+        if (days && index->GetBlockTime() < cutoff) continue;
+        CBlock block;
+        if (!ReadBlockFromDisk(block, index, Params().GetConsensus(index->nHeight), false))
+            throw JSONRPCError(RPC_MISC_ERROR, "Cannot read historical blocks");
+        for (const CTransactionRef& tx : block.vtx) {
+            if (tx->IsCoinBase()) continue;
+            for (const CTxOut& output : tx->vout) {
+                std::string message;
+                if (!ParseFloofyBurn(output, message) ||
+                    message.compare(0, 4, "LB1:") != 0) continue;
+                const size_t separator = message.find(':', 4);
+                const std::string address = message.substr(4, separator == std::string::npos ? std::string::npos : separator - 4);
+                const std::string userMessage = separator == std::string::npos ? "" : message.substr(separator + 1);
+                const CBitcoinAddress destination(address);
+                CKeyID key;
+                if (!destination.IsValid() || !destination.GetKeyID(key))
+                    continue;
+                BurnClaim claim;
+                claim.address = address;
+                claim.message = userMessage;
+                claim.amount = output.nValue;
+                claim.txid = tx->GetHash();
+                claim.height = index->nHeight;
+                claim.time = index->GetBlockTime();
+                for (const CTxIn& input : tx->vin) {
+                    claim.inputs.push_back(input.prevout);
+                    fundingScripts.emplace(input.prevout, CScript());
+                }
+                if (!claim.inputs.empty()) claims.push_back(std::move(claim));
+            }
+        }
+    }
+
+    // Resolve every referenced funding outpoint from the same active chain.
+    for (const CBlockIndex* index : indexes) {
+        if (fundingScripts.empty()) break;
+        CBlock block;
+        if (!ReadBlockFromDisk(block, index, Params().GetConsensus(index->nHeight), false))
+            throw JSONRPCError(RPC_MISC_ERROR, "Cannot resolve burn inputs");
+        for (const CTransactionRef& tx : block.vtx) {
+            const uint256 txid = tx->GetHash();
+            for (size_t i = 0; i < tx->vout.size(); ++i) {
+                const COutPoint out(txid, static_cast<uint32_t>(i));
+                auto it = fundingScripts.find(out);
+                if (it != fundingScripts.end())
+                    it->second = tx->vout[i].scriptPubKey;
+            }
+        }
+    }
+
+    struct Rank { CAmount total = 0; int burns = 0; uint256 latestTxid; std::string latestMessage; int latestHeight = -1; };
+    std::map<std::string, Rank> totals;
+    for (const BurnClaim& claim : claims) {
+        const CBitcoinAddress address(claim.address);
+        const CScript required = GetScriptForDestination(address.Get());
+        bool verified = true;
+        for (const COutPoint& input : claim.inputs) {
+            auto it = fundingScripts.find(input);
+            if (it == fundingScripts.end() || it->second != required) {
+                verified = false;
+                break;
+            }
+        }
+        if (!verified || claim.amount <= 0) continue;
+        Rank& rank = totals[claim.address];
+        if (rank.total > MAX_MONEY - claim.amount)
+            throw JSONRPCError(RPC_MISC_ERROR, "Leaderboard total overflow");
+        rank.total += claim.amount;
+        ++rank.burns;
+        if (claim.height >= rank.latestHeight) {
+            rank.latestHeight = claim.height;
+            rank.latestTxid = claim.txid;
+            rank.latestMessage = claim.message;
+        }
+    }
+
+    std::vector<std::pair<std::string, Rank>> ordered(totals.begin(), totals.end());
+    std::sort(ordered.begin(), ordered.end(), [](const std::pair<std::string, Rank>& a,
+                                                 const std::pair<std::string, Rank>& b) {
+        if (a.second.total != b.second.total) return a.second.total > b.second.total;
+        return a.first < b.first;
+    });
+
+    {
+        LOCK(cs_main);
+        // A newer block is not a reorganisation. Verify that the exact
+        // historical snapshot tip is still on the active chain.
+        if (chainActive.Height() < tipHeight ||
+            chainActive[tipHeight]->GetBlockHash() != tipHash)
+            throw JSONRPCError(RPC_MISC_ERROR, "Chain reorganised during leaderboard scan");
+    }
+
+    UniValue entries(UniValue::VARR);
+    for (size_t i = 0; i < ordered.size() && i < 100; ++i) {
+        UniValue item(UniValue::VOBJ);
+        item.pushKV("rank", static_cast<int>(i + 1));
+        item.pushKV("address", ordered[i].first);
+        item.pushKV("amount", ValueFromAmount(ordered[i].second.total));
+        item.pushKV("burns", ordered[i].second.burns);
+        item.pushKV("latest_txid", ordered[i].second.latestTxid.GetHex());
+        item.pushKV("latest_message", ordered[i].second.latestMessage);
+        item.pushKV("latest_height", ordered[i].second.latestHeight);
+        entries.push_back(item);
+    }
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("height", tipHeight);
+    result.pushKV("blockhash", tipHash.GetHex());
+    result.pushKV("days", days);
+    result.pushKV("leaderboard", entries);
+    if (!cacheReady || cachedTipHash != tipHash) {
+        cachedPeriods.clear();
+        cachedTipHash = tipHash;
+        cacheReady = true;
+    }
+    cachedPeriods[days] = result;
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ ----------
@@ -2458,6 +2646,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "verifychain",            &verifychain,            true,  {"checklevel","nblocks"} },
 
     { "blockchain",         "preciousblock",          &preciousblock,          true,  {"blockhash"} },
+    { "blockchain",         "getburnleaderboard",   &getburnleaderboard,     true,  {"days"} },
     { "blockchain",         "getburnedtotal",         &getburnedtotal,         true,  {} },
     { "blockchain",         "listburntransactions",   &listburntransactions,   true,  {"start_height", "block_count"} },
 
