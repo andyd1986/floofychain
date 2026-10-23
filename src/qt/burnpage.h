@@ -11,6 +11,10 @@
 class BitcoinAmountField;
 class ClientModel;
 class QCheckBox;
+class QComboBox;
+class QTableWidget;
+class QTimer;
+class FloofyLeaderboardWorker;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -33,6 +37,9 @@ private Q_SLOTS:
     void workerFinished();
     void updateAvailable();
     void copyTransactionId();
+    void refreshLeaderboardAddresses();
+    void refreshLeaderboard();
+    void leaderboardFinished();
 
 private:
     void beginPreview(bool commitAfterConfirmation);
@@ -44,6 +51,12 @@ private:
     WalletModel* walletModel;
     BitcoinAmountField* amountField;
     QLineEdit* messageField;
+    QComboBox* leaderboardAddressField;
+    QComboBox* leaderboardPeriod;
+    QTableWidget* leaderboardTable;
+    QLabel* leaderboardStatus;
+    QTimer* leaderboardTimer;
+    FloofyLeaderboardWorker* leaderboardWorker;
     QCheckBox* acknowledgeBox;
     QLabel* availableLabel;
     QLabel* minimumLabel; // FLOOF_MIN_BURN_250000

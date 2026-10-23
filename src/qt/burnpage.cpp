@@ -13,6 +13,7 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QClipboard>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -21,6 +22,10 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QThread>
+#include <QSet>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <exception>
 
@@ -29,8 +34,8 @@
 class FloofyBurnWorker : public QThread
 {
 public:
-    FloofyBurnWorker(CAmount amount, const QString& message, bool preview, QObject* parent)
-        : QThread(parent), amount_(amount), message_(message), preview_(preview) {}
+    FloofyBurnWorker(CAmount amount, const QString& message, bool preview, const QString& address, QObject* parent)
+        : QThread(parent), amount_(amount), message_(message), preview_(preview), address_(address) {}
 
     UniValue result;
     QString error;
@@ -46,6 +51,7 @@ protected:
             request.params.push_back(false); // Never subtract fees from the burn amount.
             request.params.push_back(message_.toStdString());
             request.params.push_back(preview_);
+            if (!address_.isEmpty()) request.params.push_back(address_.toStdString());
             result = tableRPC.execute(request);
         } catch (const UniValue& rpcError) {
             const UniValue reason = find_value(rpcError, "message");
@@ -63,6 +69,32 @@ private:
     CAmount amount_;
     QString message_;
     bool preview_;
+    QString address_;
+};
+
+class FloofyLeaderboardWorker : public QThread
+{
+public:
+    explicit FloofyLeaderboardWorker(int days, QObject* parent) : QThread(parent), days_(days) {}
+    UniValue result;
+    QString error;
+protected:
+    void run() override {
+        try {
+            JSONRPCRequest req;
+            req.strMethod = "getburnleaderboard";
+            req.params = UniValue(UniValue::VARR);
+            req.params.push_back(days_);
+            result = tableRPC.execute(req);
+        } catch (const UniValue& e) {
+            const UniValue msg = find_value(e, "message");
+            error = msg.isStr() ? QString::fromStdString(msg.get_str()) : QStringLiteral("RPC failure");
+        } catch (const std::exception& e) {
+            error = QString::fromUtf8(e.what());
+        } catch (...) { error = QStringLiteral("Unknown leaderboard error"); }
+    }
+private:
+    int days_;
 };
 
 BurnPage::BurnPage(QWidget* parent)
@@ -71,6 +103,12 @@ BurnPage::BurnPage(QWidget* parent)
       walletModel(nullptr),
       amountField(nullptr),
       messageField(nullptr),
+      leaderboardAddressField(nullptr),
+      leaderboardPeriod(nullptr),
+      leaderboardTable(nullptr),
+      leaderboardStatus(nullptr),
+      leaderboardTimer(nullptr),
+      leaderboardWorker(nullptr),
       acknowledgeBox(nullptr),
       availableLabel(nullptr),
       minimumLabel(nullptr),
@@ -134,6 +172,13 @@ BurnPage::BurnPage(QWidget* parent)
     messageRow->addWidget(messageField, 1);
     form->addLayout(messageRow);
 
+    QLabel* rankingTitle = new QLabel(tr("Verified leaderboard address (optional)"), card);
+    form->addWidget(rankingTitle);
+    leaderboardAddressField = new QComboBox(card);
+    leaderboardAddressField->setToolTip(tr("Only confirmed spendable coins belonging to this address will fund the burn. Your normal signed transaction provides proof of ownership."));
+    form->addWidget(leaderboardAddressField);
+    refreshLeaderboardAddresses();
+
     QLabel* feeNotice = new QLabel(
         tr("The exact entered amount is burned. A network transaction fee is "
            "charged separately. Preview shows the estimated total wallet cost."),
@@ -176,7 +221,43 @@ BurnPage::BurnPage(QWidget* parent)
     form->addWidget(copyButton);
 
     main->addWidget(card);
+
+    QFrame* board = new QFrame(this);
+    board->setObjectName("burnPageLeaderboard");
+    QVBoxLayout* boardLayout = new QVBoxLayout(board);
+    QHBoxLayout* boardControls = new QHBoxLayout();
+    QLabel* boardTitle = new QLabel(tr("Verified Burn Leaderboard"), board);
+    leaderboardPeriod = new QComboBox(board);
+    leaderboardPeriod->addItem(tr("All time"), 0);
+    leaderboardPeriod->addItem(tr("Last 30 days"), 30);
+    leaderboardPeriod->addItem(tr("Last 7 days"), 7);
+    QPushButton* refresh = new QPushButton(tr("Refresh"), board);
+    boardControls->addWidget(boardTitle);
+    boardControls->addStretch();
+    boardControls->addWidget(leaderboardPeriod);
+    boardControls->addWidget(refresh);
+    boardLayout->addLayout(boardControls);
+    leaderboardTable = new QTableWidget(0, 6, board);
+    leaderboardTable->setHorizontalHeaderLabels(QStringList()
+        << tr("Rank") << tr("Address") << tr("FLOOF burned") << tr("Burns")
+        << tr("Latest TXID") << tr("Message"));
+    leaderboardTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    leaderboardTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    leaderboardTable->horizontalHeader()->setStretchLastSection(true);
+    leaderboardTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    boardLayout->addWidget(leaderboardTable);
+    leaderboardStatus = new QLabel(tr("Leaderboard not yet loaded"), board);
+    boardLayout->addWidget(leaderboardStatus);
+    main->addWidget(board);
     main->addStretch();
+
+    leaderboardTimer = new QTimer(this);
+    leaderboardTimer->setInterval(600000);
+    connect(leaderboardTimer, SIGNAL(timeout()), this, SLOT(refreshLeaderboard()));
+    connect(leaderboardPeriod, SIGNAL(currentIndexChanged(int)), this, SLOT(refreshLeaderboard()));
+    connect(refresh, SIGNAL(clicked()), this, SLOT(refreshLeaderboard()));
+    leaderboardTimer->start();
+    QTimer::singleShot(0, this, SLOT(refreshLeaderboard()));
 
     connect(previewButton, SIGNAL(clicked()), this, SLOT(previewClicked()));
     connect(burnButton, SIGNAL(clicked()), this, SLOT(burnClicked()));
@@ -189,6 +270,8 @@ BurnPage::~BurnPage()
         worker->wait(); // Commit/preview must not outlive its owner.
         delete worker;
     }
+    if (leaderboardTimer) leaderboardTimer->stop();
+    if (leaderboardWorker) { leaderboardWorker->wait(); delete leaderboardWorker; }
     unlockContext.reset(); // Relock if this action originally unlocked the wallet.
 }
 
@@ -209,6 +292,7 @@ void BurnPage::setWalletModel(WalletModel* model)
                 this, SLOT(updateAvailable()));
     }
     updateAvailable();
+    refreshLeaderboardAddresses();
 }
 
 QString BurnPage::formatAmount(CAmount amount) const
@@ -306,6 +390,7 @@ void BurnPage::beginPreview(bool commitAfterConfirmation)
     unlockContext.reset(new WalletModel::UnlockContext(context));
     commitRequested = commitAfterConfirmation;
     executingCommit = false;
+    leaderboardAddressField->setEnabled(false);
     amountField->setEnabled(false);
     messageField->setEnabled(false);
     acknowledgeBox->setEnabled(false);
@@ -322,7 +407,8 @@ void BurnPage::beginPreview(bool commitAfterConfirmation)
 
 void BurnPage::beginWorker(bool preview)
 {
-    worker = new FloofyBurnWorker(amountField->value(), messageField->text(), preview, this);
+    worker = new FloofyBurnWorker(amountField->value(), messageField->text(), preview,
+                                  leaderboardAddressField->currentData().toString(), this);
     connect(worker, SIGNAL(finished()), this, SLOT(workerFinished()));
     worker->start();
 }
@@ -330,6 +416,7 @@ void BurnPage::beginWorker(bool preview)
 void BurnPage::finishOperation()
 {
     unlockContext.reset();
+    leaderboardAddressField->setEnabled(true);
     amountField->setEnabled(true);
     messageField->setEnabled(true);
     acknowledgeBox->setEnabled(true);
@@ -439,10 +526,97 @@ void BurnPage::workerFinished()
     amountField->clear();
     messageField->clear();
     finishOperation();
+    refreshLeaderboard();
 }
 
 void BurnPage::copyTransactionId()
 {
     if (!lastTxid.isEmpty())
         QApplication::clipboard()->setText(lastTxid);
+}
+
+void BurnPage::refreshLeaderboardAddresses()
+{
+    if (!leaderboardAddressField) return;
+    const QString previous = leaderboardAddressField->currentData().toString();
+    leaderboardAddressField->clear();
+    leaderboardAddressField->addItem(tr("Standard burn (no leaderboard attribution)"), QString());
+    if (!walletModel) return;
+    try {
+        JSONRPCRequest request;
+        request.strMethod = "listunspent";
+        request.params = UniValue(UniValue::VARR);
+        request.params.push_back(1);
+        const UniValue outputs = tableRPC.execute(request);
+        if (!outputs.isArray()) return;
+        QSet<QString> known;
+        for (const UniValue& coin : outputs.getValues()) {
+            const UniValue address = find_value(coin, "address");
+            const UniValue spendable = find_value(coin, "spendable");
+            if (!address.isStr() || (spendable.isBool() && !spendable.get_bool())) continue;
+            const QString a = QString::fromStdString(address.get_str());
+            if (known.contains(a)) continue;
+            known.insert(a);
+            leaderboardAddressField->addItem(a, a);
+        }
+        const int index = leaderboardAddressField->findData(previous);
+        if (index >= 0) leaderboardAddressField->setCurrentIndex(index);
+    } catch (...) {
+        // The normal burn workflow remains available without an address.
+    }
+}
+
+void BurnPage::refreshLeaderboard()
+{
+    if (leaderboardWorker || !leaderboardPeriod || !leaderboardTable) return;
+    leaderboardStatus->setText(tr("Checking confirmed burns…"));
+    leaderboardWorker = new FloofyLeaderboardWorker(leaderboardPeriod->currentData().toInt(), this);
+    connect(leaderboardWorker, SIGNAL(finished()), this, SLOT(leaderboardFinished()));
+    leaderboardWorker->start();
+}
+
+void BurnPage::leaderboardFinished()
+{
+    if (!leaderboardWorker) return;
+    FloofyLeaderboardWorker* done = leaderboardWorker;
+    leaderboardWorker = nullptr;
+    const UniValue reply = done->result;
+    const QString err = done->error;
+    done->deleteLater();
+    if (!err.isEmpty() || !reply.isObject()) {
+        leaderboardStatus->setText(err.isEmpty() ? tr("Leaderboard unavailable") : err);
+        return;
+    }
+    const UniValue rows = find_value(reply, "leaderboard");
+    if (!rows.isArray()) {
+        leaderboardStatus->setText(tr("Unexpected leaderboard result"));
+        return;
+    }
+    leaderboardTable->setRowCount(0);
+    for (const UniValue& entry : rows.getValues()) {
+        if (!entry.isObject()) continue;
+        const UniValue rank = find_value(entry, "rank");
+        const UniValue addr = find_value(entry, "address");
+        const UniValue amount = find_value(entry, "amount");
+        const UniValue burns = find_value(entry, "burns");
+        const UniValue txid = find_value(entry, "latest_txid");
+        const UniValue message = find_value(entry, "latest_message");
+        if (!rank.isNum() || !addr.isStr() || !amount.isNum() || !burns.isNum()) continue;
+        const int row = leaderboardTable->rowCount();
+        leaderboardTable->insertRow(row);
+        const QString fields[] = {
+            QString::number(rank.get_int()),
+            QString::fromStdString(addr.get_str()),
+            QString::fromStdString(amount.write()),
+            QString::number(burns.get_int()),
+            txid.isStr() ? QString::fromStdString(txid.get_str()) : QString(),
+            message.isStr() ? QString::fromStdString(message.get_str()) : QString()
+        };
+        for (int col = 0; col < 6; ++col)
+            leaderboardTable->setItem(row, col, new QTableWidgetItem(fields[col]));
+    }
+    const UniValue height = find_value(reply, "height");
+    leaderboardStatus->setText(tr("Verified on-chain • Height %1 • %2 ranked addresses")
+        .arg(height.isNum() ? height.get_int() : 0)
+        .arg(leaderboardTable->rowCount()));
 }
