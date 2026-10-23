@@ -79,3 +79,86 @@ For additional protocol information, see [the consensus source](src/chainparams.
 ---
 
 **What a bunch of floof.** 🐾
+## 🔥 FloofyChain Voluntary Burning & Leaderboard
+
+FloofyChain includes a voluntary coin-burning system that allows holders to permanently remove FLOOF from circulation through provably unspendable blockchain transactions.
+
+The wallet also features a **Verified Burn Leaderboard**, giving the community a transparent way to track individual burning contributions.
+
+### Features
+
+| Feature | Description |
+|---|---|
+| Provable burning | FLOOF permanently removed using OP_RETURN |
+| Minimum burn | 1,000 FLOOF under the active consensus rule |
+| Verified addresses | Signed transaction inputs establish funding-address attribution |
+| All-time leaderboard | Top verified burners throughout blockchain history |
+| 30-day leaderboard | Rolling monthly rankings |
+| 7-day leaderboard | Rolling weekly rankings |
+| Transaction information | Latest TXID, message, burn count and total |
+| Automatic refresh | Every 10 minutes |
+| Manual refresh | Available from the Burn page |
+| Global statistics | Existing network-wide burned totals preserved |
+
+### How to Burn FLOOF
+
+1. Open FloofyChain Qt Wallet.
+2. Navigate to **Burn**.
+3. Enter the FLOOF amount.
+4. Optionally select a funded leaderboard address.
+5. Enter an optional message within the permitted character limit.
+6. Preview the transaction and estimated fee.
+7. Confirm the irreversible burn.
+
+Once confirmed on the blockchain, an eligible signed burn contributes to the leaderboard.
+
+### CLI / RPC
+
+**Global burn statistics**
+
+```bash
+floofy-cli getburnedtotal
+```
+
+**All-time leaderboard**
+
+```bash
+floofy-cli getburnleaderboard 0
+```
+
+**Last 30 days**
+
+```bash
+floofy-cli getburnleaderboard 30
+```
+
+**Last 7 days**
+
+```bash
+floofy-cli getburnleaderboard 7
+```
+
+**Signed burn preview**
+
+```bash
+floofy-cli burn 1000 false "" true "YOUR_FLOOF_ADDRESS"
+```
+
+Set the preview argument to `false` only when intentionally submitting an irreversible burn.
+
+### Important Notes
+
+- Burning destroys FLOOF permanently.
+- Transaction fees are additional to the amount burned.
+- Existing unverified historical burns remain included in global totals.
+- Only successfully verified, confirmed address-attributed burns appear in the leaderboard.
+- The leaderboard does not introduce any new consensus rules.
+- Full historical leaderboard scans require locally available blockchain data.
+
+### Blockchain Explorer
+
+Follow confirmed transactions and their OP_RETURN burn records:
+
+https://explorer.floofychain.com
+
+**🔥 Every verified burn counts. Every FLOOF burned is gone forever.**
