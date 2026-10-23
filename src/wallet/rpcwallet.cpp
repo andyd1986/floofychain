@@ -31,6 +31,7 @@
 
 #include <stdint.h>
 #include <atomic>
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <map>
@@ -453,7 +454,7 @@ static UniValue burn(const JSONRPCRequest& request)
 {
     if (request.fHelp ||
         request.params.size() < 1 ||
-        request.params.size() > 4)
+        request.params.size() > 5)
     {
         throw std::runtime_error(
             "burn amount (subtractfeefromamount) "
@@ -509,6 +510,35 @@ static UniValue burn(const JSONRPCRequest& request)
         message = request.params[2].get_str();
     }
 
+    // Optional signed-input leaderboard mode. Only one funding address is
+    // permitted; the standard transaction signatures prove that it was spent.
+    std::string leaderboardAddress;
+    CTxDestination leaderboardDestination;
+    if (request.params.size() > 4 && !request.params[4].isNull()) {
+        leaderboardAddress = request.params[4].get_str();
+        const CBitcoinAddress address(leaderboardAddress);
+        CKeyID keyID;
+        if (!address.IsValid() || !address.GetKeyID(keyID))
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+                               "Leaderboard address must be a P2PKH key address");
+        leaderboardDestination = address.Get();
+        // On-chain attribution: the entire marker must fit the existing 48-byte
+        // optional burn-message limit. No burn consensus format is changed.
+        // Preserve an optional user message after the verifiable address.
+        // Existing canonical burn messages allow at most 48 printable bytes.
+        // The LB1 address consumes most of that budget; reject oversize text
+        // rather than silently discarding it.
+        const std::string marker = std::string("LB1:") + leaderboardAddress;
+        if (!message.empty()) {
+            if (marker.size() + 1 + message.size() > FLOOF_BURN_MAX_MESSAGE)
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Signed burn message exceeds available %u characters",
+                              static_cast<unsigned int>(FLOOF_BURN_MAX_MESSAGE - marker.size() - 1)));
+            message = marker + ":" + message;
+        } else {
+            message = marker;
+        }
+    }
     if (!IsValidFloofyBurnMessage(message))
         throw JSONRPCError(
             RPC_INVALID_PARAMETER,
@@ -533,6 +563,9 @@ static UniValue burn(const JSONRPCRequest& request)
     }
 
     EnsureWalletIsUnlocked();
+    if (!leaderboardAddress.empty() &&
+        !IsMine(*pwalletMain, leaderboardDestination))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Leaderboard address not owned");
 
     // Build a provably unspendable output.
     const CScript scriptPubKey =
@@ -555,6 +588,58 @@ static UniValue burn(const JSONRPCRequest& request)
 
     std::string error;
     CCoinControl coinControl;
+    if (!leaderboardAddress.empty()) {
+        std::vector<COutput> available;
+        pwalletMain->AvailableCoins(available, true);
+        // Select only enough UTXOs to fund this burn, not every output
+        // belonging to the address (a mining wallet may hold thousands).
+        struct BurnInput {
+            COutPoint outpoint;
+            CAmount value;
+        };
+        std::vector<BurnInput> candidates;
+        for (const COutput& coin : available) {
+            if (!coin.fSpendable) continue;
+            const CTxOut& output = coin.tx->tx->vout[coin.i];
+            CTxDestination destination;
+            if (!ExtractDestination(output.scriptPubKey, destination) ||
+                destination != leaderboardDestination) continue;
+            candidates.push_back({COutPoint(coin.tx->GetHash(), coin.i), output.nValue});
+        }
+        // Leave a modest fee allowance. CreateTransaction still determines
+        // and validates the actual fee under the existing wallet policy.
+        const CAmount feeAllowance = COIN;
+        if (amount > MAX_MONEY - feeAllowance)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Burn exceeds available money range");
+        const CAmount target = amount + feeAllowance;
+        // Prefer a single smallest sufficient output, minimising input count
+        // and avoiding oversized transactions for ordinary burns.
+        const BurnInput* single = nullptr;
+        for (const BurnInput& coin : candidates) {
+            if (coin.value >= target && (!single || coin.value < single->value))
+                single = &coin;
+        }
+        CAmount selected = 0;
+        if (single) {
+            coinControl.Select(single->outpoint);
+            selected = single->value;
+        } else {
+            std::sort(candidates.begin(), candidates.end(),
+                      [](const BurnInput& a, const BurnInput& b) {
+                          return a.value > b.value;
+                      });
+            for (const BurnInput& coin : candidates) {
+                coinControl.Select(coin.outpoint);
+                selected += coin.value;
+                if (selected >= target) break;
+            }
+        }
+        if (selected < target)
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS,
+                               "Insufficient confirmed funds at leaderboard address for burn and fee");
+        coinControl.destChange = leaderboardDestination;
+        coinControl.fAllowOtherInputs = false;
+    }
 
     if (!pwalletMain->CreateTransaction(
             recipients,
@@ -569,6 +654,15 @@ static UniValue burn(const JSONRPCRequest& request)
             RPC_WALLET_ERROR,
             "Burn transaction creation failed: " + error
         );
+    }
+
+    // Ensure no other wallet address can fund this claimed leaderboard burn.
+    if (!leaderboardAddress.empty()) {
+        for (const CTxIn& input : walletTx.tx->vin) {
+            if (!coinControl.IsSelected(input.prevout))
+                throw JSONRPCError(RPC_WALLET_ERROR,
+                                   "Unexpected funding input in leaderboard burn");
+        }
     }
 
     // Verify the finished transaction before signing off.
@@ -623,6 +717,7 @@ static UniValue burn(const JSONRPCRequest& request)
     );
 
     result.pushKV("method", "OP_RETURN");
+    if (!leaderboardAddress.empty()) result.pushKV("leaderboard_address", leaderboardAddress);
     result.pushKV("message", message);
 
     if (preview)
