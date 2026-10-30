@@ -75,6 +75,12 @@ struct Params {
     int64_t nFloofyAdaptiveHalfLife = 0;
     // Separate ASERT for native and AuxPoW, both eligible for every block.
     bool fFloofyDualPowDifficulty = false;
+    // One shared ASERT base target, adjusted for mining type by rolling balance.
+    bool fFloofySharedBalancedDifficulty = false;
+    // Separate from the new ASERT anchor: historical balance counting begins here.
+    uint32_t nFloofyBalanceStartHeight = 0;
+    uint32_t nFloofyCheckpointHeight = 0;
+    uint256 hashFloofyCheckpoint;
     bool fPowAllowDigishieldMinDifficultyBlocks; // Allow minimum difficulty blocks where a retarget would normally occur
     bool fSimplifiedRewards; // Use block height derived rewards rather than previous block hash derived
 

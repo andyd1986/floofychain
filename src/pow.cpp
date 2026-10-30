@@ -140,7 +140,10 @@ void FloofyGetRollingWindowCounts(const CBlockIndex* parent,
         parent->nHeight < static_cast<int>(params.nHeightEffective))
         return;
 
-    const int FORK_PARENT = static_cast<int>(params.nHeightEffective) - 1;
+    const int FORK_PARENT = static_cast<int>(
+        params.fFloofySharedBalancedDifficulty
+            ? params.nFloofyBalanceStartHeight
+            : params.nHeightEffective) - 1;
     const int WINDOW_START = parent->nHeight - 1000;
     const int boundary = WINDOW_START > FORK_PARENT
         ? WINDOW_START : FORK_PARENT;
@@ -262,6 +265,12 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             return pindexLast->nBits;
         if (params.fFloofyDualPowDifficulty)
             return FloofyDualNextWork(pindexLast, pblock, params);
+        if (params.fFloofySharedBalancedDifficulty) {
+            assert(pblock != nullptr);
+            const unsigned int baseBits = FloofyAdaptiveNextWork(pindexLast, params);
+            return FloofyApplyRollingBalance(baseBits, pindexLast,
+                                             pblock->IsAuxpow(), params);
+        }
         return FloofyAdaptiveNextWork(pindexLast, params);
     }
 

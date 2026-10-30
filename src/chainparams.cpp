@@ -74,6 +74,7 @@ private:
     Consensus::Params digishieldConsensus;
     Consensus::Params auxpowConsensus;
     Consensus::Params dualMiningConsensus;
+    Consensus::Params sharedBalancedConsensus;
 
 public:
     CMainParams()
@@ -173,6 +174,15 @@ public:
         dualMiningConsensus.nFloofyAdaptiveHalfLife = 60 * 60;
         dualMiningConsensus.fFloofyDualPowDifficulty = true;
 
+        // New shared ASERT base + rolling balancing, without separate DAA lanes.
+        sharedBalancedConsensus = dualMiningConsensus;
+        sharedBalancedConsensus.nHeightEffective = 245122;
+        sharedBalancedConsensus.fFloofyDualPowDifficulty = false;
+        sharedBalancedConsensus.fFloofySharedBalancedDifficulty = true;
+        sharedBalancedConsensus.nFloofyBalanceStartHeight = 245000;
+        sharedBalancedConsensus.nFloofyCheckpointHeight = 245121;
+        sharedBalancedConsensus.hashFloofyCheckpoint = uint256S("0xb2a87a314cd3696bcea3d2530fa9362fe362b2179952ed2e99313285afe238d2");
+
         // Both independent difficulty streams use block 244999 as their
         // anchor. Either mining method may produce block 245000.
         // Regtest stays on its own 20/30/40/50 activation schedule.
@@ -180,16 +190,17 @@ public:
         digishieldConsensus.pLeft = &consensus;
         digishieldConsensus.pRight = &auxpowConsensus;
         auxpowConsensus.pRight = &dualMiningConsensus;
+        dualMiningConsensus.pRight = &sharedBalancedConsensus;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
          * a large 32-bit integer with any alignment.
          */
-        pchMessageStart[0] = 0xa3;
-        pchMessageStart[1] = 0xf1;
-        pchMessageStart[2] = 0xc7;
-        pchMessageStart[3] = 0x9e;
+        pchMessageStart[0] = 0xd4;
+        pchMessageStart[1] = 0x6c;
+        pchMessageStart[2] = 0xb2;
+        pchMessageStart[3] = 0x91;
         nDefaultPort = 6661;
         nPruneAfterHeight = 100000;
 
@@ -199,6 +210,7 @@ public:
         digishieldConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         auxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         dualMiningConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+        sharedBalancedConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         assert(consensus.hashGenesisBlock == uint256S("0xd4c3cabcae34cbf79a2f5198806e16d5176c097973c6b0305ddd8b9e9d139ad0"));
         assert(genesis.hashMerkleRoot == uint256S("0xfb302a48e0870d4f80943e4ced86db117f623993fcd1de6b7f59893cf2684124"));
 
@@ -228,7 +240,8 @@ public:
         	(50000, uint256S("11b1bae732bc9439159e756791cb060c4b18d2a03c784ed7f68bfd788925b0c0"))
 	        (100000, uint256S("87e9cdbb5a2268adca90057a2af74635ad806c8ce381db91db253096a1340e1f")) // Block at height 100000
 	        (150000, uint256S("9f7411c63836526a923985b9136a45c2ce1fcfae275994569bfaebbb17bb2333")) // Block at height 150000
-	        (200000, uint256S("cddb1930e0737f95dc7d74e9901b9302c7a8dbd6c6510ba2b41b2ced238a73ad"))}; // Block at height 200000
+	        (200000, uint256S("cddb1930e0737f95dc7d74e9901b9302c7a8dbd6c6510ba2b41b2ced238a73ad"))
+                (245121, uint256S("0xb2a87a314cd3696bcea3d2530fa9362fe362b2179952ed2e99313285afe238d2"))}; // Block at height 200000
 
         chainTxData = ChainTxData{
             1790124769,
@@ -382,6 +395,7 @@ private:
     Consensus::Params strictAuxpowConsensus;
     Consensus::Params adaptiveDifficultyConsensus;
     Consensus::Params dualMiningConsensus;
+    Consensus::Params sharedBalancedConsensus;
 
 public:
     CRegTestParams()
@@ -471,6 +485,13 @@ public:
         dualMiningConsensus.nHeightEffective = 50;
         dualMiningConsensus.fFloofyDualPowDifficulty = true;
 
+        sharedBalancedConsensus = dualMiningConsensus;
+        sharedBalancedConsensus.nHeightEffective = 60;
+        sharedBalancedConsensus.fFloofyDualPowDifficulty = false;
+        sharedBalancedConsensus.fFloofySharedBalancedDifficulty = true;
+        sharedBalancedConsensus.nFloofyBalanceStartHeight = 50;
+        dualMiningConsensus.pRight = &sharedBalancedConsensus;
+
         // regtest consensus tree:
         // 0..9 native / 10..19 DigiShield / 20..29 legacy AuxPoW
         // 30..39 strict AuxPoW / 40+ strict AuxPoW plus adaptive difficulty.
@@ -496,6 +517,7 @@ public:
         strictAuxpowConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         adaptiveDifficultyConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         dualMiningConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
+        sharedBalancedConsensus.hashGenesisBlock = consensus.hashGenesisBlock;
         assert(consensus.hashGenesisBlock == uint256S("0xbe7e23a656babcef9d3304d396b6155233ecbcce5a73c1eb40544472f40e2b17"));
         assert(genesis.hashMerkleRoot == uint256S("0xfb302a48e0870d4f80943e4ced86db117f623993fcd1de6b7f59893cf2684124"));
 

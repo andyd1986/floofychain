@@ -2831,7 +2831,8 @@ CBlockIndex* AddToBlockIndex(const CBlockHeader& block)
     }
     // Cache independent PoW/AuxPoW history on the branch being indexed.
     pindexNew->BuildFloofyMiningHistory(
-        Params().GetConsensus(pindexNew->nHeight).fFloofyDualPowDifficulty);
+        Params().GetConsensus(pindexNew->nHeight).fFloofyDualPowDifficulty ||
+        Params().GetConsensus(pindexNew->nHeight).fFloofySharedBalancedDifficulty);
     pindexNew->nTimeMax = (pindexNew->pprev ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime) : pindexNew->nTime);
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
@@ -3126,6 +3127,20 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
     const CChainParams& params = Params();
     const Consensus::Params& consensusParams = params.GetConsensus(nHeight);
+
+    // FLOOF: mandatory recovery history for new block headers on mainnet.
+    if (params.NetworkIDString() == "main") {
+        const Consensus::Params& latest = params.GetConsensus(2147483647);
+        const int h = static_cast<int>(latest.nFloofyCheckpointHeight);
+        if (h > 0) {
+            if (nHeight == h && block.GetHash() != latest.hashFloofyCheckpoint)
+                return state.DoS(100, false, REJECT_INVALID, "bad-recovery-checkpoint");
+            if (nHeight > h &&
+                (pindexPrev == nullptr || pindexPrev->GetAncestor(h) == nullptr ||
+                 pindexPrev->GetAncestor(h)->GetBlockHash() != latest.hashFloofyCheckpoint))
+                return state.DoS(100, false, REJECT_INVALID, "bad-recovery-ancestor");
+        }
+    }
 
     // Disallow legacy blocks after merge-mining start.
     if (!consensusParams.fAllowLegacyBlocks
@@ -3765,7 +3780,8 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
         CBlockIndex* pindex = item.second;
         // Restore in-memory lane caches after restart, in height order.
         pindex->BuildFloofyMiningHistory(
-            chainparams.GetConsensus(pindex->nHeight).fFloofyDualPowDifficulty);
+            chainparams.GetConsensus(pindex->nHeight).fFloofyDualPowDifficulty ||
+            chainparams.GetConsensus(pindex->nHeight).fFloofySharedBalancedDifficulty);
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         pindex->nTimeMax = (pindex->pprev ? std::max(pindex->pprev->nTimeMax, pindex->nTime) : pindex->nTime);
         // We can link the chain of blocks for which we've received transactions at some point.
