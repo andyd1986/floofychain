@@ -1,164 +1,135 @@
-# 🐾 FloofyChain (FLOOF)
+🐾 FloofyChain (FLOOF)
+A Scrypt cryptocurrency where native Proof-of-Work and AuxPoW merge miners compete for every block.
 
-FloofyChain is a Scrypt-based cryptocurrency supporting both **native Proof-of-Work (PoW)** and **Auxiliary Proof-of-Work (AuxPoW)** mining.
+FloofyChain is an open-source, Scrypt-based Layer 1 cryptocurrency featuring native PoW mining, AuxPoW merged mining, adaptive difficulty, scheduled mining-reward multipliers, and voluntary on-chain coin burning. The V4 network uses a shared ASERT difficulty baseline with a capped balancing adjustment designed to give underrepresented mining methods a better chance of finding blocks — without enforcing a 50/50 split.
 
-The network uses block rewards, scheduled reward multiplier events, and a mining consensus designed to balance opportunities between native and merge miners.
+Website · Block Explorer · Source Code
+V4 network notice: Older clients using the previous mainnet network identifier are incompatible with the upgraded V4 peer network. Back up your wallet before installing new software or resetting blockchain data. See Upgrading to V4 below.
 
-**Website:** https://floofychain.com  
-**Block Explorer:** https://explorer.floofychain.com
+⚙️ Network at a glance
+Property	FloofyChain
+Coin / ticker	FloofyChain / FLOOF
+Source-code client version	4.0.4 (V4 series)
+Mining algorithm	Scrypt
+Mining methods	Native PoW and AuxPoW (merged mining)
+Target block interval	300 seconds (5 minutes) under the upgraded rules
+Difficulty adjustment	One shared anchored ASERT baseline, plus per-method rolling balance
+ASERT half-life	3,600 seconds (1 hour)
+Balancing window	Previous 1,000 accepted blocks
+Mining eligibility	Both methods may mine every block; no alternation or quota
+AuxPoW chain ID	666 (0x029A)
+Mainnet P2P port	6661
+New mainnet PCH / message start	d4 6c b2 91
+Mining consensus transition	Block 245,000
+Shared-ASERT transition	Block 245,122
+Minimum-burn activation	Block 250,000, minimum 1,000 FLOOF
+Fees	No automatic transaction tax, developer tax, or mandatory burn tax
+Supply / rewards	Ongoing block subsidies with scheduled reward-multiplier events
 
-## ⚙️ Key Features
 
-- **Coin:** FloofyChain (FLOOF)
-- **Core version:** 3.0.3
-- **Algorithm:** Scrypt
-- **Mining:** Native PoW and AuxPoW (merge mining)
-- **Block target:** 5 minutes under the new consensus
-- **Mining distribution:** approximately 50/50 long-term target when both mining types participate
-- **Difficulty:** Independent ASERT plus a rolling 1,000-block balance
-- **AuxPoW chain ID:** 666
-- **Fees:** No transaction tax, automatic burn fee, or developer fee
-- **Rewards:** Block rewards with scheduled multiplier events
+Block intervals are a target average, not a guarantee: individual blocks may arrive earlier or later.
+⛏️ Native PoW and AuxPoW: real competition, no forced turns
+FloofyChain supports two ways to find a valid block:
+- Native PoW: Miners perform Scrypt work directly against the FloofyChain block target.
+- AuxPoW: Merge miners commit to a FloofyChain block through a valid parent-chain proof of work.
+Both methods are eligible for every next block. A PoW miner can find several consecutive blocks; so can an AuxPoW miner. The protocol does not alternate methods, reserve mining slots, or wait for a method-specific timeout.
+How V4 difficulty balancing works
+1. Shared ASERT follows the timing of the whole accepted blockchain, aiming for a five-minute average. When overall blocks arrive too quickly, the shared difficulty rises; when too slowly, it falls as blocks are accepted.
+2. Rolling balance counts how many of the previous 1,000 accepted blocks were found by each method.
+3. If AuxPoW has won more blocks, native PoW receives an easier target and AuxPoW a harder one. If native PoW dominates, the adjustment reverses.
+4. If block counts are equal, the balancing adjustment is neutral.
+The adjustment is deliberately capped. At maximum dominance, the underrepresented method's target may become up to 2× easier, while the dominant method's target may become up to 2× harder, subject to the network proof-of-work limit. In difficulty terms, that is roughly half the base difficulty for the minority method and twice the base difficulty for the majority method.
 
-## ⛏️ Independent Native PoW and AuxPoW Mining
+This is not a 50/50 rewards promise. A 1 GH/s native miner can still be heavily outmatched by a 1 TH/s merge-mining pool. The system improves the smaller miner's relative chance of winning a block; it does not guarantee one, or seek to make unequal hashrates equal.
+ASERT can adjust the target only after a valid block is accepted. If a large pool disappears suddenly, the first replacement block may still take considerably longer than five minutes.
 
-Both native Scrypt PoW and AuxPoW miners can compete to mine **every block**. There is **no forced alternation or waiting period**.
+📈 Shared ASERT difficulty
+The upgraded difficulty calculation uses:
+- A single anchored ASERT baseline shared by both mining methods.
+- A 300-second expected interval for each accepted block in the shared stream.
+- A one-hour half-life for responding to accumulated block-time error.
+- Accepted-chain history, not the candidate block's timestamp, to set the candidate's own difficulty.
+- An additional, deterministic 1,000-block balancing multiplier chosen by the candidate's mining method.
+The calculation is performed for the next candidate block each time the chain tip changes. No fixed clock timer changes difficulty independently of accepted blocks.
+Consensus activation history
+Mainnet height	Consensus change
+Through 244,999	Historical rules retained.
+245,000	New strict AuxPoW validation and the initial anchored adaptive, dual-method difficulty rules activate.
+245,121	Pinned checkpoint anchoring the selected upgraded chain history.
+245,122	Shared five-minute ASERT baseline plus capped rolling PoW/AuxPoW balance replaces the initial independent difficulty lanes.
+250,000	Consensus-enforced 1,000 FLOOF minimum for canonical burns.
 
-Each mining type has a separate ASERT difficulty target designed for roughly one block every 10 minutes when participation is steady. A **rolling 1,000-block balancing adjustment** increases the difficulty of whichever type has mined more of the recent blocks and reduces it for the underrepresented type. With both types active, the combined aim is a **five-minute average** and approximately **50/50 over time**, not a mandatory quota.
 
-If a merge-mining pool goes offline, native miners can continue mining without waiting for a timeout. Likewise, AuxPoW miners can keep mining when native miners are unavailable. Every block still needs a valid proof of work.
+The checkpoint at 245,121 identifies the intended V4 chain history. The upgraded release must agree on the checkpoint and the same consensus settings across all nodes.
+🔐 AuxPoW validation and network separation
+V4 enforces strict merged-mining proof validation, including the expected chain ID, AuxPoW commitment structure, parent proof of work, and the appropriate block target.
 
-## 📈 ASERT Difficulty Adjustment
+The upgraded mainnet also uses the P2P message-start bytes d4 6c b2 91, replacing the old a3 f1 c7 9e identifier. Older nodes may continue mining independently, but their P2P messages are rejected by the upgraded network.
 
-FloofyChain uses **separate anchored ASERT-style difficulty calculations** for native PoW and AuxPoW:
+Changing PCH isolates P2P networks; consensus rules and checkpoints determine block validity. Miners, wallets, pools, and explorers should upgrade to a compatible V4 build and connect to verified V4 peers.
+🎉 Block rewards and multiplier events
+FloofyChain distributes ongoing block subsidies and applicable transaction fees to miners. Selected block ranges receive scheduled block-reward multiplier events. The exact reward depends on the block height and the active consensus rules.
 
-- **5-minute combined block target** when both mining types have stable participation.
-- **10-minute average target per mining type** (600 seconds).
-- **Independent histories:** difficulty uses the previous accepted blocks of its own type, including runs of consecutive blocks.
-- **1-hour half-life:** difficulty adjusts gradually as block production runs ahead of or behind schedule.
-- **Common starting anchor:** both difficulty calculations start from block **244,999**.
+Community participation in future reward events remains part of the project roadmap. Any planned community-voting milestone is separate from the V4 mining-consensus activation heights.
+🔥 Voluntary burning and verified leaderboard
+FloofyChain offers optional, irreversible FLOOF burning through provably unspendable OP_RETURN outputs. Burning is a voluntary user action, not a tax charged on transfers or mining rewards.
 
-After **every accepted block**, each mining type's next target is recalculated using its own ASERT history and the preceding **1,000 accepted blocks**. The balancing history starts at block 245,000 and grows gradually until full; it then slides forward one block at a time. When the last 1,000 blocks are evenly split, the balancing factor is neutral. At its maximum, a lane's additional adjustment ranges from **half to twice its ASERT target**. The block-count balancing step never uses candidate timestamps. Accepted historical timestamps still inform ASERT.
+From mainnet block 250,000, consensus rejects canonical burn transactions below 1,000 FLOOF. Network transaction fees are additional to the burned amount.
 
-## 🔐 Strict AuxPoW Validation
+The Qt wallet's Burn page provides:
+Feature	Description
+Provable burn	Permanently removes FLOOF from spendable circulation using OP_RETURN.
+Minimum amount	1,000 FLOOF after the activation height.
+Burn preview	Inspect the transaction before irreversible submission.
+Optional burn message	Up to 48 printable ASCII bytes, including any leaderboard marker.
+Verified attribution	A special signed-input burn can attribute eligible burns to a wallet-controlled funding address.
+All-time ranking	Confirmed, address-verified leaderboard burns.
+Recent rankings	Last 30 days and last 7 days.
+Leaderboard refresh	Automatic Qt refresh every 10 minutes; manual refresh also available.
+Global statistics	Includes legacy supported burn methods, even when not eligible for address attribution.
 
-AuxPoW blocks must provide a valid merged-mining commitment and parent proof of work. The new consensus verifies the AuxPoW structure, chain ID, and required difficulty instead of relying on the historical compatibility shortcut.
 
-## 🔄 Consensus Fork — Block 245,000
-
-The new mining rules activate together at **mainnet block 245,000**.
-
-| Activation | Change |
-|---|---|
-| **245,000** | Strict AuxPoW proof validation |
-| **245,000** | Anchored ASERT difficulty and a five-minute combined block target |
-| **245,000** | Independent native PoW and AuxPoW difficulty calculations |
-| **245,000** | Rolling 1,000-block capped balancing adjustment |
-| **245,000** | Both mining types remain eligible for consecutive blocks |
-
-Blocks through **244,999** retain their historical rules. Block **244,999** anchors both new difficulty histories. Nodes and mining pools need compatible software for the consensus transition.
-
-A height-based upgrade cannot change difficulty or unblock mining below its activation height.
-
-## 🎉 Mining Rewards
-
-FloofyChain rewards miners through block subsidies and transaction fees, with **scheduled multiplier events** during selected block ranges.
-
-- Reward multiplier events are scheduled at 20,000-block intervals.
-- Regular event windows last approximately 5,000 blocks.
-- Community involvement in future multiplier events is part of the project roadmap.
-
-The **mining consensus fork at block 245,000** is separate from the roadmap's community-voting milestone associated with **block 500,000**.
-
-## 🤖 Community
-
-FloofyChain also has a Discord wallet bot and community tools for activities such as tipping, wallet balances, and other supported services.
-
-For additional protocol information, see [the consensus source](src/chainparams.cpp), [difficulty implementation](src/pow.cpp), and [block validation](src/validation.cpp).
-
----
-
-**What a bunch of floof.** 🐾
-## 🔥 FloofyChain Voluntary Burning & Leaderboard
-
-FloofyChain includes a voluntary coin-burning system that allows holders to permanently remove FLOOF from circulation through provably unspendable blockchain transactions.
-
-The wallet also features a **Verified Burn Leaderboard**, giving the community a transparent way to track individual burning contributions.
-
-### Features
-
-| Feature | Description |
-|---|---|
-| Provable burning | FLOOF permanently removed using OP_RETURN |
-| Minimum burn | 1,000 FLOOF under the active consensus rule |
-| Verified addresses | Signed transaction inputs establish funding-address attribution |
-| All-time leaderboard | Top verified burners throughout blockchain history |
-| 30-day leaderboard | Rolling monthly rankings |
-| 7-day leaderboard | Rolling weekly rankings |
-| Transaction information | Latest TXID, message, burn count and total |
-| Automatic refresh | Every 10 minutes |
-| Manual refresh | Available from the Burn page |
-| Global statistics | Existing network-wide burned totals preserved |
-
-### How to Burn FLOOF
-
-1. Open FloofyChain Qt Wallet.
-2. Navigate to **Burn**.
-3. Enter the FLOOF amount.
-4. Optionally select a funded leaderboard address.
-5. Enter an optional message within the permitted character limit.
-6. Preview the transaction and estimated fee.
-7. Confirm the irreversible burn.
-
-Once confirmed on the blockchain, an eligible signed burn contributes to the leaderboard.
-
-### CLI / RPC
-
-**Global burn statistics**
-
-```bash
+Burn from Qt: Open the wallet, select Burn, choose an amount, optionally choose a funded leaderboard address and message, preview the transaction, and confirm. Confirmed eligible burns appear in the relevant leaderboard after a scan.
+Burn RPC examples
+# Total confirmed network burns (requires full historical blocks)
 floofy-cli getburnedtotal
-```
 
-**All-time leaderboard**
+# Verified leaderboards
+floofy-cli getburnleaderboard 0   # All time
+floofy-cli getburnleaderboard 30  # Last 30 days
+floofy-cli getburnleaderboard 7   # Last 7 days
 
-```bash
-floofy-cli getburnleaderboard 0
-```
+# Preview a regular 1,000 FLOOF burn; does not broadcast
+floofy-cli burn 1000 false "" true
 
-**Last 30 days**
-
-```bash
-floofy-cli getburnleaderboard 30
-```
-
-**Last 7 days**
-
-```bash
-floofy-cli getburnleaderboard 7
-```
-
-**Signed burn preview**
-
-```bash
+# Preview with signed-input leaderboard attribution (fifth parameter)
 floofy-cli burn 1000 false "" true "YOUR_FLOOF_ADDRESS"
-```
+Warning: Changing the preview argument (true) to false deliberately submits an irreversible burn. Always verify the amount, funding address, and fee first. Full historical leaderboard results require locally available, unpruned block data.
+🔄 Upgrading to V4 — important
+Existing users must move from the old peer network to V4 and synchronise with upgraded peers. Due to the recovered mainnet branch and changed PCH, old chain data or saved peers may point to an incompatible network.
 
-Set the preview argument to `false` only when intentionally submitting an irreversible burn.
+Protect your wallet first:
+1. Stop FloofyChain completely and confirm the wallet/daemon has exited.
+2. Back up wallet.dat and floofy.conf to a separate safe location. If your installation uses a wallets/ directory or additional wallet files, back up all of them. Keep any keys, recovery material and offline backups. Do not share backups or RPC credentials.
+3. Confirm the backups are readable and safely stored before removing or renaming anything.
+4. With the application closed, move aside or remove old blockchain and network caches, such as blocks/, chainstate/, optional index directories, and peers.dat. Do not delete the whole data directory: that can erase wallet.dat, wallets/, configuration and other important user data. Renaming old data for later recovery is safer than permanent deletion.
+5. Install the compatible V4 release, keep or restore your wallet and correct configuration, and ensure you connect to verified upgraded V4 nodes. Remove outdated addnode/`connect` entries pointing at old-network peers.
+6. Launch the node and allow a full resynchronisation. Do not send funds or depend on an unconfirmed balance until the wallet and node have caught up with the correct V4 chain.
+Never delete wallet.dat, the wallets/ directory, private keys, seed/recovery material, or your only backup. The network update does not require generating a new wallet address or abandoning existing keys.
 
-### Important Notes
+To confirm the upgraded tip on a command-line node:
+floofy-cli getblockchaininfo
+floofy-cli getbestblockhash
+floofy-cli getpeerinfo
+Compare the best block hash and height with another trusted V4 node once synchronised. If you have wallet funds or run a mining pool/exchange, keep a recoverable copy of your old data until the migration is validated.
 
-- Burning destroys FLOOF permanently.
-- Transaction fees are additional to the amount burned.
-- Existing unverified historical burns remain included in global totals.
-- Only successfully verified, confirmed address-attributed burns appear in the leaderboard.
-- The leaderboard does not introduce any new consensus rules.
-- Full historical leaderboard scans require locally available blockchain data.
-
-### Blockchain Explorer
-
-Follow confirmed transactions and their OP_RETURN burn records:
-
-https://explorer.floofychain.com
-
-**🔥 Every verified burn counts. Every FLOOF burned is gone forever.**
+🤖 Ecosystem and community
+The FloofyChain ecosystem includes a blockchain explorer, Qt wallet, community Discord bot, and additional community-oriented tools. Features may require separate services, compatible software, and their own configuration.
+- Official site: https://floofychain.com
+- Block explorer: https://explorer.floofychain.com
+- Main source repository: https://github.com/andyd1986/floofychain
+-BitcoinANN: https://bitcointalk.org/index.php?topic=5598242.msg67289410#msg67289410
+- Consensus parameters: [`src/chainparams.cpp`](src/chainparams.cpp)
+- Difficulty and balancing: [`src/pow.cpp`](src/pow.cpp)
+- Block validation: [`src/validation.cpp`](src/validation.cpp)
+What a bunch of floof. 🐾 Keep mining,
