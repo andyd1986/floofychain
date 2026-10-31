@@ -37,6 +37,19 @@
 #include <stdio.h>
 
 #include <QCloseEvent>
+#include <QImage>
+#include <QVariant>
+#include <QPixmap>
+#include <QComboBox>
+#include <QFontMetrics>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QMessageBox>
+#include <QStringList>
+#include <QtGlobal>
+
+#include <QApplication>
+#include <QDesktopWidget>
 #include <QFont>
 #include <QLabel>
 #include <QRegExp>
@@ -90,7 +103,13 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
         ui->aboutMessage->setTextFormat(Qt::RichText);
         ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         text = version + "\n" + licenseInfo;
-        ui->aboutMessage->setText(version + "<br><br>" + licenseInfoHTML);
+        // FLOOFY_V4_BLUE_ART_PACK: community mascot artwork above license text.
+        const QString floofyV4Art = QStringLiteral(
+            "<div style=\"text-align:center; padding:6px;\">"
+            "<img src=\":/floofy-v4/floofy-friends\" width=\"390\" />"
+            "<p style=\"color:#277DB7; font-weight:bold;\">What a bunch of floof!</p>"
+            "</div>");
+        ui->aboutMessage->setText(floofyV4Art + version + "<br><br>" + licenseInfoHTML);
         ui->aboutMessage->setWordWrap(true);
         ui->helpMessage->setVisible(false);
     } else {
@@ -190,20 +209,35 @@ PaperWalletDialog::PaperWalletDialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::PaperWalletDialog)
 {
+    // FLOOFY_V4_PAPERWALLET_10_PAGES_6_PER_PAGE_V6
+    // Keep preview scrollable while all print controls remain visible.
     ui->setupUi(this);
-
     ui->buttonBox->addButton(tr("Close"), QDialogButtonBox::RejectRole);
 
-    // Begin with a small bold monospace font for the textual version of the key and address.
-    QFont font("Courier");
-    font.setBold(true);
-    font.setStyleHint(QFont::TypeWriter);
-    font.setPixelSize(1);
-    ui->addressText->setFont(font);
-    ui->privateKeyText->setFont(font);
-    ui->addressText->setAlignment(Qt::AlignJustify);
-    ui->privateKeyText->setAlignment(Qt::AlignJustify);
-    setFixedSize(size());
+    ui->paperScroll->setWidgetResizable(false);
+    ui->paperTemplate->setScaledContents(true);
+    ui->addressQRCode->setScaledContents(false);
+    ui->privateKeyQRCode->setScaledContents(false);
+    ui->addressQRCode->setAlignment(Qt::AlignCenter);
+    ui->privateKeyQRCode->setAlignment(Qt::AlignCenter);
+
+    QFont mono("DejaVu Sans Mono");
+    mono.setStyleHint(QFont::TypeWriter);
+    mono.setPixelSize(12);
+    mono.setBold(true);
+    ui->addressText->setFont(mono);
+    ui->privateKeyText->setFont(mono);
+    ui->addressText->setWordWrap(true);
+    ui->privateKeyText->setWordWrap(true);
+    ui->addressText->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->privateKeyText->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    ui->walletsPerPageCombo->setCurrentIndex(1); // 2 different wallets / A4 sheet
+
+    const QRect available = QApplication::desktop()->availableGeometry(this);
+    const int width = qMax(410, qMin(590, available.width()-48));
+    const int height = qMax(390, qMin(650, available.height()-80));
+    resize(width, height);
+    move(available.center() - rect().center());
 }
 
 void PaperWalletDialog::setClientModel(ClientModel *_clientModel)
@@ -230,162 +264,240 @@ PaperWalletDialog::~PaperWalletDialog()
 
 void PaperWalletDialog::on_getNewAddress_clicked()
 {
-    // Create a new private key
+    // FLOOFY_V4_PAPERWALLET_10_PAGES_6_PER_PAGE_V6
+    // Preserve the original offline paper-key creation path.
     CKey privKey;
     privKey.MakeNewKey(true);
-
-    // Derive the public key
-    CPubKey pubkey = privKey.GetPubKey();
-
-    // Derive the public key hash
+    const CPubKey pubkey = privKey.GetPubKey();
     CBitcoinAddress pubkeyhash;
     pubkeyhash.Set(pubkey.GetID());
+    const std::string myPrivKey = CBitcoinSecret(privKey).ToString();
+    const std::string myPubKey = HexStr(pubkey.begin(), pubkey.end());
+    const std::string myAddress = pubkeyhash.ToString();
 
-    // Create String versions of each
-    std::string myPrivKey = CBitcoinSecret(privKey).ToString();
-    std::string myPubKey = HexStr(pubkey.begin(), pubkey.end());
-    std::string myAddress = pubkeyhash.ToString();
+    const QString address = QString::fromStdString(myAddress);
+    const QString wif = QString::fromStdString(myPrivKey);
+    ui->addressText->setProperty("floofyRawAddress", address);
+    ui->privateKeyText->setProperty("floofyRawWif", wif);
+    // Split at fixed character boundaries for legible printed text. The
+    // underlying raw strings above never lose any characters.
+    const int aSplit=(address.length()+1)/2;
+    const int kSplit=(wif.length()+1)/2;
+    ui->addressText->setText(address.left(aSplit)+QStringLiteral("\n")+address.mid(aSplit));
+    ui->privateKeyText->setText(wif.left(kSplit)+QStringLiteral("\n")+wif.mid(kSplit));
+    ui->publicKey->setPlainText(QString::fromStdString(myPubKey));
 
+    ui->addressQRCode->clear();
+    ui->privateKeyQRCode->clear();
+    ui->addressQRCode->setProperty("floofyRawQr", QVariant());
+    ui->privateKeyQRCode->setProperty("floofyRawQr", QVariant());
 
 #ifdef USE_QRCODE
-    // Generate the address QR code
-    QRcode *code = QRcode_encodeString(myAddress.c_str(), 0, QR_ECLEVEL_M, QR_MODE_8, 1);
-    if (!code) {
-        ui->addressQRCode->setText(tr("Error encoding Address into QR Code."));
-        return;
-    }
-    QImage myImage = QImage(code->width, code->width, QImage::Format_ARGB32);
-    myImage.fill(QColor(0, 0, 0, 0));
-    unsigned char* p = code->data;
-    for (int y = 0; y < code->width; y++) {
-        for (int x = 0; x < code->width; x++) {
-            myImage.setPixel(x, y, ((*p & 1) ? 0xff000000 : 0x0));
-            p++;
+    // Four-module white quiet zones. Keep the unscaled QImage for the printer
+    // and use the same exact QR payload in the screen preview.
+    auto generateQR=[](QLabel* target, const std::string& contents)->bool {
+        QRcode *qr=QRcode_encodeString(contents.c_str(),0,QR_ECLEVEL_M,QR_MODE_8,1);
+        if (!qr || qr->width<=0) {
+            if (qr) QRcode_free(qr);
+            target->setText(QObject::tr("QR unavailable"));
+            return false;
         }
+        const int border=4;
+        const int modules=qr->width;
+        QImage image(modules+2*border,modules+2*border,QImage::Format_RGB32);
+        image.fill(Qt::white);
+        for (int y=0;y<modules;++y)
+            for (int x=0;x<modules;++x)
+                image.setPixel(x+border,y+border,
+                    (qr->data[y*modules+x]&1)?qRgb(0,0,0):qRgb(255,255,255));
+        QRcode_free(qr);
+        target->setProperty("floofyRawQr", QVariant::fromValue(image));
+        target->setPixmap(QPixmap::fromImage(image).scaled(
+            target->size(),Qt::KeepAspectRatio,Qt::FastTransformation));
+        return true;
+    };
+    if (!generateQR(ui->addressQRCode,myAddress) ||
+        !generateQR(ui->privateKeyQRCode,myPrivKey)) {
+        ui->addressQRCode->clear();
+        ui->privateKeyQRCode->clear();
+        ui->addressQRCode->setProperty("floofyRawQr", QVariant());
+        ui->privateKeyQRCode->setProperty("floofyRawQr", QVariant());
     }
-    QRcode_free(code);
-
-
-    // Generate the private key QR code
-    code = QRcode_encodeString(myPrivKey.c_str(), 0, QR_ECLEVEL_M, QR_MODE_8, 1);
-    if (!code) {
-        ui->privateKeyQRCode->setText(tr("Error encoding private key into QR Code."));
-        return;
-    }
-    QImage myImagePriv = QImage(code->width, code->width, QImage::Format_ARGB32);
-    myImagePriv.fill(QColor(0, 0, 0, 0));
-    p = code->data;
-    for (int y = 0; y < code->width; y++) {
-        for (int x = 0; x < code->width; x++) {
-            myImagePriv.setPixel(x, y, ((*p & 1) ? 0xff000000 : 0x0));
-            p++;
-        }
-    }
-    QRcode_free(code);
-
-    // Populate the QR Codes
-    ui->addressQRCode->setPixmap(QPixmap::fromImage(myImage).scaled(ui->addressQRCode->width(), ui->addressQRCode->height()));
-    ui->privateKeyQRCode->setPixmap(QPixmap::fromImage(myImagePriv).scaled(ui->privateKeyQRCode->width(), ui->privateKeyQRCode->height()));
+#else
+    // Printing is refused when the required QR-code feature is not compiled.
+    ui->addressQRCode->setText(tr("QR support disabled"));
+    ui->privateKeyQRCode->setText(tr("QR support disabled"));
 #endif
-
-    // Populate the Texts
-    ui->addressText->setText(myAddress.c_str());
-    ui->privateKeyText->setText(tr(myPrivKey.c_str()));
-
-    ui->publicKey->setHtml(myPubKey.c_str());
-
-    // Update the fonts to fit the height of the wallet.
-    // This should only really trigger the first time since the font size persists.
-    double paperHeight = (double)ui->paperTemplate->height();
-    double maxTextWidth = paperHeight * 0.98;
-    double minTextWidth = paperHeight * 0.95;
-    int pixelSizeStep = 1;
-
-    int addressTextLength = ui->addressText->fontMetrics().boundingRect(ui->addressText->text()).width();
-    QFont font = ui->addressText->font();
-    for (int i = 0; i < PAPER_WALLET_READJUST_LIMIT; i++) {
-        if (addressTextLength < minTextWidth) {
-            font.setPixelSize(font.pixelSize() + pixelSizeStep);
-            ui->addressText->setFont(font);
-            addressTextLength = ui->addressText->fontMetrics().boundingRect(ui->addressText->text()).width();
-        } else {
-            break;
-        }
-    }
-    if (addressTextLength > maxTextWidth) {
-        font.setPixelSize(font.pixelSize() - pixelSizeStep);
-        ui->addressText->setFont(font);
-        addressTextLength = ui->addressText->fontMetrics().boundingRect(ui->addressText->text()).width();
-    }
-
-    int privateKeyTextLength = ui->privateKeyText->fontMetrics().boundingRect(ui->privateKeyText->text()).width();
-    font = ui->privateKeyText->font();
-    for (int i = 0; i < PAPER_WALLET_READJUST_LIMIT; i++) {
-        if (privateKeyTextLength < minTextWidth) {
-            font.setPixelSize(font.pixelSize() + pixelSizeStep);
-            ui->privateKeyText->setFont(font);
-            privateKeyTextLength = ui->privateKeyText->fontMetrics().boundingRect(ui->privateKeyText->text()).width();
-        } else {
-            break;
-        }
-    }
-    if (privateKeyTextLength > maxTextWidth) {
-        font.setPixelSize(font.pixelSize() - pixelSizeStep);
-        ui->privateKeyText->setFont(font);
-        privateKeyTextLength = ui->privateKeyText->fontMetrics().boundingRect(ui->privateKeyText->text()).width();
-    }
 }
 
 void PaperWalletDialog::on_printButton_clicked()
 {
+    // FLOOFY_V4_PAPERWALLET_10_PAGES_6_PER_PAGE_V6
+    // Dogecoin/Floofy-style page count is separate from wallets/page.
+    // Example: 5 A4 pages x 4 wallets/page = 20 unique paper wallets.
+    const int pageCount = ui->walletCount->currentIndex()+1; // 1..10
+    const int walletsPerPage = ui->walletsPerPageCombo->currentIndex()+1; // 1..6
+    if (pageCount<1 || pageCount>10 || walletsPerPage<1 || walletsPerPage>6) {
+        QMessageBox::critical(this,tr("Paper wallet settings"),
+            tr("Select 1 to 10 A4 pages and 1 to 6 wallets per page."));
+        return;
+    }
+    const int totalWallets = pageCount * walletsPerPage;
+
+    const int columns = walletsPerPage<=2 ? 1 : 2;
+    const int rows = (walletsPerPage+columns-1)/columns;
+    const qreal maxMM = (walletsPerPage==1)?155.0:
+                        (walletsPerPage==2)?127.0:
+                        (walletsPerPage<=4)?94.0:89.0;
+
+    auto fullAddress=[&]()->QString {
+        return ui->addressText->property("floofyRawAddress").toString();
+    };
+    auto validWallet=[&]()->bool {
+        const QImage publicQR=ui->addressQRCode->property("floofyRawQr").value<QImage>();
+        const QImage privateQR=ui->privateKeyQRCode->property("floofyRawQr").value<QImage>();
+        return !fullAddress().isEmpty() &&
+            !ui->privateKeyText->property("floofyRawWif").toString().isEmpty() &&
+            !publicQR.isNull() && !privateQR.isNull();
+    };
+    if (!validWallet()) {
+        QMessageBox::critical(this,tr("Paper wallet unavailable"),
+            tr("The address, private key, or QR code is unavailable. "
+               "Build the wallet with QR code support."));
+        return;
+    }
+    const QPixmap templateImage(QStringLiteral(":/icons/paper_wallet"));
+    if (templateImage.isNull()) {
+        QMessageBox::critical(this,tr("Paper wallet missing"),
+            tr("Circular paper-wallet image not found in Qt resources."));
+        return;
+    }
+
+    if (walletsPerPage>=5 && QMessageBox::warning(this,
+        tr("Small paper wallets"),
+        tr("Five or six circles per A4 sheet produce smaller QR codes and "
+           "private-key lettering. Verify every code with an offline scanner "
+           "before transferring FLOOF. Continue?"),
+        QMessageBox::Yes | QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes)
+        return;
+
     QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog* qpd = new QPrintDialog(&printer, this);
-
-    QPrinterInfo printerinfo(printer);
-    QPageSize papersize = printerinfo.defaultPageSize();
-
-    qpd->setPrintRange(QAbstractPrintDialog::AllPages);
-    QList<QString> recipientPubKeyHashes;
-
-    if (qpd->exec() != QDialog::Accepted) {
-        return;
-    }
-
+    printer.setPageSize(QPrinter::A4);
     printer.setOrientation(QPrinter::Portrait);
-    printer.QPagedPaintDevice::setPageSize(papersize);
     printer.setFullPage(true);
+    QPrintDialog dialog(&printer,this);
+    dialog.setPrintRange(QAbstractPrintDialog::AllPages);
+    if (dialog.exec()!=QDialog::Accepted) return;
 
+    // Do not let a print-dialog paper/orientation change silently clip circles.
+    printer.setPageSize(QPrinter::A4);
+    printer.setOrientation(QPrinter::Portrait);
+    printer.setFullPage(true);
     QPainter painter;
-    if (!painter.begin(&printer)) { // failed to open file
-        QMessageBox::critical(this, tr("Printing Error"), tr("failed to open file, is it writable?"), QMessageBox::Ok, QMessageBox::Ok);
+    if (!painter.begin(&printer)) {
+        QMessageBox::critical(this,tr("Printing Error"),
+            tr("Unable to initialise the selected printer."));
         return;
     }
-
-    int walletCount = ui->walletCount->currentIndex() + 1;
-    int walletsPerPage = 4;
-
-    int pageHeight = printer.pageRect().height() - PAPER_WALLET_PAGE_MARGIN;
-    int walletHeight = ui->paperTemplate->height();
-    double computedWalletHeight = 0.9 * pageHeight / walletsPerPage;
-    double scale = computedWalletHeight / walletHeight;
-    double walletPadding = pageHeight * 0.05 / (walletsPerPage - 1) / scale;
-
-    QRegion walletRegion = QRegion(ui->paperTemplate->x(), ui->paperTemplate->y(), ui->paperTemplate->width(), ui->paperTemplate->height());
-    painter.scale(scale, scale);
-
-    for (int i = 0; i < walletCount; i++) {
-        QPoint point = QPoint(PAPER_WALLET_PAGE_MARGIN, (PAPER_WALLET_PAGE_MARGIN / 2) + (i % walletsPerPage) * (walletHeight + walletPadding));
-        this->render(&painter, point, walletRegion);
-        recipientPubKeyHashes.append(ui->addressText->text());
-
-        if (i % walletsPerPage == (walletsPerPage - 1)) {
-            printer.newPage();
-        }
-
-        this->on_getNewAddress_clicked();
+    const QRect page=printer.pageRect();
+    const qreal ppm=static_cast<qreal>(printer.resolution())/25.4;
+    const qreal margin=8.0*ppm;
+    const qreal gap=5.0*ppm;
+    const qreal maxW=page.width()-2*margin-(columns-1)*gap;
+    const qreal maxH=page.height()-2*margin-(rows-1)*gap;
+    const qreal diameter=qMin(maxMM*ppm,qMin(maxW/columns,maxH/rows));
+    if (diameter<68.0*ppm) {
+        painter.end();
+        QMessageBox::critical(this,tr("Printing Error"),
+            tr("Selected A4 printable area is too small for this layout."));
+        return;
     }
+    const qreal gridW=columns*diameter+(columns-1)*gap;
+    const qreal gridH=rows*diameter+(rows-1)*gap;
+    const qreal startX=(page.width()-gridW)/2.0;
+    const qreal startY=(page.height()-gridH)/2.0;
+    const qreal logicalSize=1000.0; // The static PNG is larger, printed losslessly.
+    const qreal scale=diameter/logicalSize;
 
-    painter.end();
+    auto drawQR=[&](QLabel* label,const QRectF& zone) {
+        const QImage raw=label->property("floofyRawQr").value<QImage>();
+        painter.setRenderHint(QPainter::SmoothPixmapTransform,false);
+        // Four white QR modules are encoded in raw; nearest-neighbour output.
+        painter.drawImage(zone,raw);
+    };
+    auto drawText=[&](const QString& content,const QRectF& zone,
+                      int pixels,bool strong) {
+        QFont mono(strong?QStringLiteral("Sans Serif"):
+                          QStringLiteral("DejaVu Sans Mono"));
+        mono.setStyleHint(strong?QFont::SansSerif:QFont::TypeWriter);
+        mono.setBold(true);
+        mono.setPixelSize(pixels);
+        // Fit the longest exact address/WIF line before painting. Never
+        // truncate a private key if a platform's monospace font differs.
+        const QStringList lines=content.split(QChar('\n'));
+        while (mono.pixelSize()>16) {
+            QFontMetrics metrics(mono);
+            bool fits=true;
+            for (const QString& line : lines) {
+                if (metrics.width(line)>zone.width()-8) {fits=false;break;}
+            }
+            if (fits) break;
+            mono.setPixelSize(mono.pixelSize()-1);
+        }
+        painter.setFont(mono);
+        painter.setPen(QColor("#123A5E"));
+        painter.setRenderHint(QPainter::TextAntialiasing,true);
+        painter.drawText(zone,Qt::AlignLeft|Qt::AlignVCenter|Qt::TextWordWrap,content);
+    };
+    QList<QString> recipientPubKeyHashes;
+    // Each page is filled completely with a separate new keypair in each slot.
+    for (int sheet=0;sheet<pageCount;++sheet) {
+        if (sheet>0 && !printer.newPage()) {
+            painter.end();
+            QMessageBox::critical(this,tr("Printing Error"),
+                tr("Unable to advance to the next A4 sheet."));
+            return;
+        }
+        for (int slot=0;slot<walletsPerPage;++slot) {
+            if (!validWallet()) {
+                painter.end();
+                QMessageBox::critical(this,tr("Printing Error"),
+                    tr("Unable to generate a complete paper wallet."));
+                return;
+            }
+            const int row=slot/columns;
+            const int column=slot%columns;
+            const int countInRow=qMin(columns,walletsPerPage-row*columns);
+            const qreal rowOffset=(columns-countInRow)*(diameter+gap)/2.0;
+            painter.save();
+            painter.translate(startX+rowOffset+column*(diameter+gap),
+                              startY+row*(diameter+gap));
+            painter.scale(scale,scale);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform,true);
+            painter.drawPixmap(QRectF(0,0,1000,1000),templateImage,
+                QRectF(0,0,templateImage.width(),templateImage.height()));
+            // These positions are the enlarged white panels in the bundled PNG.
+            drawQR(ui->addressQRCode,QRectF(184,140,245,245));
+            drawText(tr("PUBLIC ADDRESS"),QRectF(461,196,385,27),22,true);
+            drawText(ui->addressText->text(),QRectF(461,229,385,94),26,false);
+            drawText(tr("PRIVATE KEY - KEEP SECRET"),QRectF(180,731,363,27),20,true);
+            drawText(ui->privateKeyText->text(),QRectF(180,765,363,92),24,false);
+            drawQR(ui->privateKeyQRCode,QRectF(572,675,212,212));
+            painter.restore();
+
+            // Pass the FULL original receiving address into the wallet's
+            // unchanged optional post-print funding/transfer routine.
+            recipientPubKeyHashes.append(fullAddress());
+            const int processed=sheet*walletsPerPage+slot+1;
+            if (processed<totalWallets)
+                this->on_getNewAddress_clicked();
+        }
+    }
+    if (!painter.end()) {
+        QMessageBox::critical(this,tr("Printing Error"),
+            tr("Printer did not finish. Verify all wallets before funding."));
+        return;
+    }
 
 #ifdef ENABLE_WALLET
     QStringList formatted;
@@ -395,7 +507,7 @@ void PaperWalletDialog::on_printButton_clicked()
         bool ok;
 
         // Ask for an amount to send to each paper wallet. It might be better to try to use the BitcoinAmountField, but this works fine.
-        double amountInput = QInputDialog::getDouble(this, tr("Load Paper Wallets"), tr("The paper wallet printing process has begun.<br/>Please wait for the wallets to print completely and verify that everything printed correctly.<br/>Check for misalignments, ink bleeding, smears, or anything else that could make the private keys unreadable.<br/>Now, enter the number of IllU you wish to send to each wallet:"), 0, 0, 2147483647, 8, &ok);
+        double amountInput = QInputDialog::getDouble(this, tr("Load Paper Wallets"), tr("The paper wallet printing process has begun.<br/>Please wait for the wallets to print completely and verify that everything printed correctly.<br/>Check for misalignments, ink bleeding, smears, or anything else that could make the private keys unreadable.<br/>Now, enter the number of FLOOF you wish to send to each wallet:"), 0, 0, 2147483647, 8, &ok);
 
         if (!ok) {
             return;

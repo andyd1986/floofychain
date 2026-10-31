@@ -122,30 +122,42 @@ floofy-cli getblockchaininfo
 floofy-cli getbestblockhash
 floofy-cli getpeerinfo
 Compare the best block hash and height with another trusted V4 node once synchronised. If you have wallet funds or run a mining pool/exchange, keep a recoverable copy of your old data until the migration is validated.
+🧪 Testing and validation
+V4 development has included tests of native PoW and AuxPoW acceptance, ASERT calculations, rolling dominance adjustments, hash-rate and block-time changes, node synchronisation, competing-chain reorganisations, restart behaviour, and simulated two-miner competition.
 
+These tests improve confidence but are not a guarantee against all future faults. Operators should monitor live block timing, tip hashes, peers, and mining distribution after upgrading.
 🤖 Ecosystem and community
 The FloofyChain ecosystem includes a blockchain explorer, Qt wallet, community Discord bot, and additional community-oriented tools. Features may require separate services, compatible software, and their own configuration.
 - Official site: https://floofychain.com
 - Block explorer: https://explorer.floofychain.com
 - Main source repository: https://github.com/andyd1986/floofychain
--BitcoinANN: https://bitcointalk.org/index.php?topic=5598242.msg67289410#msg67289410
 - Consensus parameters: [`src/chainparams.cpp`](src/chainparams.cpp)
 - Difficulty and balancing: [`src/pow.cpp`](src/pow.cpp)
 - Block validation: [`src/validation.cpp`](src/validation.cpp)
-What a bunch of floof. 🐾 Keep mining
+💜 Support FloofyChain — Donations
+FloofyChain is a community-driven project. If you would like to help support ongoing development, community activities, infrastructure and outreach, voluntary donations are appreciated.
+Coin	Donation address
+FLOOF	FBgtAgpr7LsChn3dggAKSUrNiJhdRHSHAB
+DOGE	DGpnrvtjnhaF866XKbVUpVAJsBJDKZdr6c
+LTC	MCREWjsAVoNzzRAijPWfgRT26LniSBaLH1
+BTC	3GUraGiEyvgX58cU45qRme6fdYNPM5vN5i
+ETH	0x70Ad65A242CB24cB648A7f81024EC0dA9db61024
 
-## ❤️ Support FloofyChain
 
-If you would like to support FloofyChain development, infrastructure and future releases, you can donate using any of the addresses below:
+Donation allocation
+Allocation	Share	Purpose
+Team	20%	Support the people helping operate and maintain FloofyChain.
+Development	30%	Core improvements, wallet development, software maintenance and technical infrastructure.
+Community	30%	Community programmes, events and ecosystem initiatives.
+Marketing	20%	Artwork, communications, media and promotional activities.
+Total	100%	
 
-> **DOGE**  `DGpnrvtjnhaF866XKbVUpVAJsBJDKZdr6c`
->
-> **LTC**   `MCREWjsAVoNzzRAijPWfgRT26LniSBaLH1`
->
-> **FLOOF** `FBgtAgpr7LsChn3dggAKSUrNiJhdRHSHAB`
->
-> **BTC**   `3GUraGiEyvgX58cU45qRme6fdYNPM5vN5i`
->
-> **ETH**   `0x70Ad65A242CB24cB648A7f81024EC0dA9db61024`
 
-Every donation helps support FloofyChain development, wallet improvements, infrastructure and ongoing community tools. Thank you for supporting the project! 🐾
+These percentages describe the project's intended allocation of donated funds. They are not an automatic blockchain distribution, transaction tax, or deduction from mining rewards. Always verify the destination address before sending; cryptocurrency donations may be irreversible. Send each asset only on its appropriate network.
+
+🐾 Contributors & Credits
+A special thank-you to the people contributing to FloofyChain:
+- @andyd1986 — Development: Core blockchain and wallet development, protocol improvements, and technical contributions.
+- @eddyc — Graphics, Artwork, Marketing & Media: Floofy visual designs, graphics, artwork, promotional media and marketing contributions.
+Your support helps keep FloofyChain growing. Thank you, Floofonauts! 💙
+What a bunch of floof. 🐾 Keep mining, Floofonauts!

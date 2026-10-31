@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+  <class>PaperWalletDialog</class>
+  <widget class="QDialog" name="PaperWalletDialog">
+    <property name="geometry">
+      <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>570</width>
+        <height>635</height>
+      </rect>
+    </property>
+    <property name="windowTitle">
+      <string>FloofyChain V4 - Circular A4 paper wallets</string>
+    </property>
+    <property name="minimumSize">
+      <size>
+        <width>430</width>
+        <height>350</height>
+      </size>
+    </property>
+    <layout class="QVBoxLayout" name="mainLayout">
+      <property name="spacing">
+        <number>6</number>
+      </property>
+      <property name="leftMargin">
+        <number>10</number>
+      </property>
+      <property name="rightMargin">
+        <number>10</number>
+      </property>
+      <property name="topMargin">
+        <number>8</number>
+      </property>
+      <property name="bottomMargin">
+        <number>10</number>
+      </property>
+      <item>
+        <widget class="QScrollArea" name="paperScroll">
+          <property name="widgetResizable">
+            <bool>false</bool>
+          </property>
+          <property name="alignment">
+            <set>Qt::AlignHCenter|Qt::AlignVCenter</set>
+          </property>
+          <property name="minimumSize">
+            <size>
+              <width>330</width>
+              <height>170</height>
+            </size>
+          </property>
+          <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+          </property>
+          <property name="styleSheet">
+            <string>QScrollArea { background-color: #F5FBFF; border: none; }</string>
+          </property>
+          <widget class="QWidget" name="paperPreviewCanvas">
+            <property name="geometry">
+              <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>500</width>
+                <height>500</height>
+              </rect>
+            </property>
+            <property name="minimumSize">
+              <size>
+                <width>500</width>
+                <height>500</height>
+              </size>
+            </property>
+            <property name="maximumSize">
+              <size>
+                <width>500</width>
+                <height>500</height>
+              </size>
+            </property>
+            <widget class="QLabel" name="paperTemplate">
+              <property name="geometry">
+                <rect>
+                  <x>0</x>
+                  <y>0</y>
+                  <width>500</width>
+                  <height>500</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string />
+              </property>
+              <property name="scaledContents">
+                <bool>true</bool>
+              </property>
+              <property name="pixmap">
+                <pixmap resource="../bitcoin.qrc">:/icons/paper_wallet</pixmap>
+              </property>
+            </widget>
+            <widget class="QLabel" name="addressQRCode">
+              <property name="geometry">
+                <rect>
+                  <x>92</x>
+                  <y>70</y>
+                  <width>122</width>
+                  <height>122</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string />
+              </property>
+              <property name="scaledContents">
+                <bool>false</bool>
+              </property>
+              <property name="alignment">
+                <set>Qt::AlignCenter</set>
+              </property>
+              <property name="styleSheet">
+                <string>QLabel { background: white; border: none; }</string>
+              </property>
+            </widget>
+            <widget class="QLabel" name="publicKeyTitle">
+              <property name="geometry">
+                <rect>
+                  <x>230</x>
+                  <y>98</y>
+                  <width>192</width>
+                  <height>14</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string>PUBLIC ADDRESS</string>
+              </property>
+              <property name="alignment">
+                <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="font">
+                <font>
+                  <family>Sans Serif</family>
+                  <pixelSize>10</pixelSize>
+                  <bold>true</bold>
+                </font>
+              </property>
+              <property name="styleSheet">
+                <string>QLabel { background: transparent; color: #144C78; }</string>
+              </property>
+            </widget>
+            <widget class="QLabel" name="addressText">
+              <property name="geometry">
+                <rect>
+                  <x>230</x>
+                  <y>114</y>
+                  <width>192</width>
+                  <height>47</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string />
+              </property>
+              <property name="alignment">
+                <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="wordWrap">
+                <bool>true</bool>
+              </property>
+              <property name="font">
+                <font>
+                  <family>DejaVu Sans Mono</family>
+                  <pixelSize>12</pixelSize>
+                  <bold>true</bold>
+                </font>
+              </property>
+              <property name="styleSheet">
+                <string>QLabel { background: transparent; color: #113D61; }</string>
+              </property>
+              <property name="textInteractionFlags">
+                <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+              </property>
+            </widget>
+            <widget class="QLabel" name="privateKeyTitle">
+              <property name="geometry">
+                <rect>
+                  <x>90</x>
+                  <y>366</y>
+                  <width>182</width>
+                  <height>14</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string>PRIVATE KEY - KEEP SECRET</string>
+              </property>
+              <property name="alignment">
+                <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="font">
+                <font>
+                  <family>Sans Serif</family>
+                  <pixelSize>10</pixelSize>
+                  <bold>true</bold>
+                </font>
+              </property>
+              <property name="styleSheet">
+                <string>QLabel { background: transparent; color: #144C78; }</string>
+              </property>
+            </widget>
+            <widget class="QLabel" name="privateKeyText">
+              <property name="geometry">
+                <rect>
+                  <x>90</x>
+                  <y>382</y>
+                  <width>182</width>
+                  <height>46</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string />
+              </property>
+              <property name="alignment">
+                <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="wordWrap">
+                <bool>true</bool>
+              </property>
+              <property name="font">
+                <font>
+                  <family>DejaVu Sans Mono</family>
+                  <pixelSize>12</pixelSize>
+                  <bold>true</bold>
+                </font>
+              </property>
+              <property name="styleSheet">
+                <string>QLabel { background: transparent; color: #113D61; }</string>
+              </property>
+              <property name="textInteractionFlags">
+                <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+              </property>
+            </widget>
+            <widget class="QLabel" name="privateKeyQRCode">
+              <property name="geometry">
+                <rect>
+                  <x>286</x>
+                  <y>338</y>
+                  <width>106</width>
+                  <height>106</height>
+                </rect>
+              </property>
+              <property name="text">
+                <string />
+              </property>
+              <property name="scaledContents">
+                <bool>false</bool>
+              </property>
+              <property name="alignment">
+                <set>Qt::AlignCenter</set>
+              </property>
+              <property name="styleSheet">
+                <string>QLabel { background: white; border: none; }</string>
+              </property>
+            </widget>
+          </widget>
+        </widget>
+      </item>
+      <item>
+        <layout class="QHBoxLayout" name="publicKeyRow">
+          <property name="spacing">
+            <number>6</number>
+          </property>
+          <item>
+            <widget class="QLabel" name="label_2">
+              <property name="text">
+                <string>Public key (hex)</string>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QTextEdit" name="publicKey">
+              <property name="readOnly">
+                <bool>true</bool>
+              </property>
+              <property name="acceptRichText">
+                <bool>false</bool>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>150</width>
+                  <height>27</height>
+                </size>
+              </property>
+              <property name="maximumSize">
+                <size>
+                  <width>16777215</width>
+                  <height>27</height>
+                </size>
+              </property>
+              <property name="verticalScrollBarPolicy">
+                <enum>Qt::ScrollBarAlwaysOff</enum>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+      <item>
+        <layout class="QHBoxLayout" name="sheetSettingsRow">
+          <property name="spacing">
+            <number>9</number>
+          </property>
+          <item>
+            <widget class="QLabel" name="label">
+              <property name="text">
+                <string>Pages:</string>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QComboBox" name="walletCount">
+              <property name="minimumSize">
+                <size>
+                  <width>58</width>
+                  <height>33</height>
+                </size>
+              </property>
+              <item>
+                <property name="text">
+                  <string>1</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>2</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>3</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>4</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>5</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>6</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>7</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>8</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>9</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>10</string>
+                </property>
+              </item>
+              <property name="toolTip">
+                <string>How many A4 sheets to print (1–10). Each sheet contains the selected number of unique paper wallets.</string>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QLabel" name="walletsPerPageLabel">
+              <property name="text">
+                <string>Wallets per page:</string>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QComboBox" name="walletsPerPageCombo">
+              <property name="toolTip">
+                <string>Print 1 to 6 different circular wallets on each A4 sheet. 1–2 have the largest QR codes.</string>
+              </property>
+              <item>
+                <property name="text">
+                  <string>1</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>2</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>3</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>4</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>5</string>
+                </property>
+              </item>
+              <item>
+                <property name="text">
+                  <string>6</string>
+                </property>
+              </item>
+              <property name="currentIndex">
+                <number>1</number>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <spacer name="sheetSettingsSpacer">
+              <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+              </property>
+            </spacer>
+          </item>
+        </layout>
+      </item>
+      <item>
+        <layout class="QHBoxLayout" name="actionsRow">
+          <property name="spacing">
+            <number>8</number>
+          </property>
+          <item>
+            <widget class="QPushButton" name="getNewAddress">
+              <property name="text">
+                <string>New paper wallet</string>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>115</width>
+                  <height>33</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QPushButton" name="printButton">
+              <property name="text">
+                <string>Print A4 pages</string>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>125</width>
+                  <height>33</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QDialogButtonBox" name="buttonBox">
+              <property name="standardButtons">
+                <set>QDialogButtonBox::NoButton</set>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>80</width>
+                  <height>33</height>
+                </size>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+    </layout>
+  </widget>
+  <connections>
+    <connection>
+      <sender>buttonBox</sender>
+      <signal>rejected()</signal>
+      <receiver>PaperWalletDialog</receiver>
+      <slot>reject()</slot>
+    </connection>
+  </connections>
+  <resources>
+    <include location="../bitcoin.qrc" />
+  </resources>
+</ui>

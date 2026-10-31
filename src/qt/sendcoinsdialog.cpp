@@ -26,6 +26,11 @@
 #include "wallet/wallet.h"
 
 #include <QFontMetrics>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QPixmap>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
@@ -45,6 +50,29 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+
+    // FLOOFY_V4_BLUE_ART_PACK: decorative header; no transaction logic changes.
+    QFrame* floofyV4Banner = new QFrame(this);
+    floofyV4Banner->setObjectName("floofyV4PageBanner");
+    QHBoxLayout* floofyV4BannerRow = new QHBoxLayout(floofyV4Banner);
+    floofyV4BannerRow->setContentsMargins(12, 4, 12, 4);
+    floofyV4BannerRow->setSpacing(12);
+    QLabel* floofyV4BannerArt = new QLabel(floofyV4Banner);
+    floofyV4BannerArt->setPixmap(QPixmap(":/floofy-v4/flaffy").scaled(
+        55, 55, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    floofyV4BannerArt->setFixedWidth(60);
+    floofyV4BannerRow->addWidget(floofyV4BannerArt);
+    QVBoxLayout* floofyV4BannerText = new QVBoxLayout();
+    floofyV4BannerText->setSpacing(1);
+    QLabel* floofyV4BannerTitle = new QLabel(tr("Send FLOOF"), floofyV4Banner);
+    floofyV4BannerTitle->setObjectName("floofyV4PageTitle");
+    QLabel* floofyV4BannerCaption = new QLabel(tr("Check addresses carefully before confirming a payment."), floofyV4Banner);
+    floofyV4BannerCaption->setObjectName("floofyV4PageCaption");
+    floofyV4BannerCaption->setWordWrap(true);
+    floofyV4BannerText->addWidget(floofyV4BannerTitle);
+    floofyV4BannerText->addWidget(floofyV4BannerCaption);
+    floofyV4BannerRow->addLayout(floofyV4BannerText, 1);
+    ui->verticalLayout->insertWidget(0, floofyV4Banner);
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->addButton->setIcon(QIcon());

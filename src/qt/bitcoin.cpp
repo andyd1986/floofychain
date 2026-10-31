@@ -317,15 +317,16 @@ BitcoinApplication::BitcoinApplication():
 
     // The GUI-only pastel theme is embedded in the Qt resource bundle, so it
     // works in both static Windows and Linux builds without external files.
+    // FLOOFY_V4_BLUE_ART_PACK: light blue/white application palette.
     QPalette pastelPalette = palette();
-    pastelPalette.setColor(QPalette::Window, QColor("#F3F7FF"));
+    pastelPalette.setColor(QPalette::Window, QColor("#EAF6FF"));
     pastelPalette.setColor(QPalette::Base, QColor("#FFFFFF"));
-    pastelPalette.setColor(QPalette::AlternateBase, QColor("#F5F0FF"));
-    pastelPalette.setColor(QPalette::Text, QColor("#35324E"));
-    pastelPalette.setColor(QPalette::WindowText, QColor("#35324E"));
-    pastelPalette.setColor(QPalette::Button, QColor("#E5DEFF"));
-    pastelPalette.setColor(QPalette::ButtonText, QColor("#35324E"));
-    pastelPalette.setColor(QPalette::Highlight, QColor("#8B80D6"));
+    pastelPalette.setColor(QPalette::AlternateBase, QColor("#F2FAFF"));
+    pastelPalette.setColor(QPalette::Text, QColor("#183A58"));
+    pastelPalette.setColor(QPalette::WindowText, QColor("#183A58"));
+    pastelPalette.setColor(QPalette::Button, QColor("#D2ECFF"));
+    pastelPalette.setColor(QPalette::ButtonText, QColor("#183A58"));
+    pastelPalette.setColor(QPalette::Highlight, QColor("#2B8BD6"));
     pastelPalette.setColor(QPalette::HighlightedText, Qt::white);
     setPalette(pastelPalette);
 

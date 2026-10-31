@@ -25,6 +25,12 @@
 #include <QCloseEvent>
 #include <QDesktopWidget>
 #include <QPainter>
+#include <QLinearGradient>
+#include <QFont>
+#include <QLinearGradient>
+#include <QFont>
+#include <QLinearGradient>
+#include <QFont>
 #include <QRadialGradient>
 
 #include <boost/bind/bind.hpp>
@@ -32,107 +38,117 @@
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) :
     QWidget(0, f), curAlignment(0)
 {
-    // set reference point, paddings
-    int paddingRight            = 50;
-    int paddingTop              = 50;
-    int titleVersionVSpace      = 17;
-    int titleCopyrightVSpace    = 40;
-
-    float fontFactor            = 1.0;
-    float devicePixelRatio      = 1.0;
+    // FLOOFY_V4_GROUP_ART_PATCH_2026: original Floofy group art + donations.
+    const QSize logicalSize(980, 590);
+    qreal ratio = 1.0;
 #if QT_VERSION > 0x050100
-    devicePixelRatio = ((QGuiApplication*)QCoreApplication::instance())->devicePixelRatio();
+    ratio = ((QGuiApplication*)QCoreApplication::instance())->devicePixelRatio();
 #endif
-
-    // define text to place
-    QString titleText       = tr(PACKAGE_NAME);
-    QString versionText     = QString("Version %1").arg(QString::fromStdString(FormatFullVersion()));
-    QString copyrightText   = QString::fromUtf8(CopyrightHolders(strprintf("\xc2\xA9 %u-%u ", 2009, COPYRIGHT_YEAR)).c_str());
-    QString titleAddText    = networkStyle->getTitleAddText();
-
-    QString font            = "Comic Sans MS";
-
-    // create a bitmap according to device pixelratio
-    QSize splashSize(480*devicePixelRatio,320*devicePixelRatio);
-    pixmap = QPixmap(splashSize);
-
+    pixmap = QPixmap(QSize(qRound(logicalSize.width() * ratio),
+                           qRound(logicalSize.height() * ratio)));
 #if QT_VERSION > 0x050100
-    // change to HiDPI if it makes sense
-    pixmap.setDevicePixelRatio(devicePixelRatio);
+    pixmap.setDevicePixelRatio(ratio);
 #endif
+    pixmap.fill(Qt::transparent);
+    QPainter paint(&pixmap);
+    paint.setRenderHint(QPainter::Antialiasing, true);
+    paint.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    QPainter pixPaint(&pixmap);
-    pixPaint.setPen(QColor(100,100,100));
+    QLinearGradient background(0, 0, 980, 590);
+    background.setColorAt(0.0, QColor("#F0FAFF"));
+    background.setColorAt(0.58, QColor("#BDE9FF"));
+    background.setColorAt(1.0, QColor("#6ABDF4"));
+    paint.fillRect(QRect(QPoint(0, 0), logicalSize), background);
+    paint.setPen(Qt::NoPen);
+    paint.setBrush(QColor(255, 255, 255, 80));
+    paint.drawEllipse(QRect(24, 17, 290, 205));
+    paint.drawEllipse(QRect(752, 27, 130, 130));
 
-    // draw a slightly radial gradient
-    QRadialGradient gradient(QPoint(0,0), splashSize.width()/devicePixelRatio);
-    gradient.setColorAt(0, Qt::white);
-    gradient.setColorAt(1, QColor(247,247,247));
-    QRect rGradient(QPoint(0,0), splashSize);
-    pixPaint.fillRect(rGradient, gradient);
+    paint.setBrush(QColor(255, 255, 255, 240));
+    paint.setPen(QPen(QColor("#B5DDF6"), 1));
+    paint.drawRoundedRect(QRect(28, 25, 924, 510), 24, 24);
 
-    // draw the bitcoin icon, expected size of PNG: 1024x1024
-    QRect rectIcon(QPoint(-150,-122), QSize(430,430));
+    paint.setPen(QColor("#163F64"));
+    paint.setFont(QFont("Sans Serif", 31, QFont::Bold));
+    paint.drawText(QRect(65, 45, 570, 55), Qt::AlignLeft | Qt::AlignVCenter,
+                   tr("FloofyChain"));
+    paint.setPen(QColor("#247EBF"));
+    paint.setFont(QFont("Sans Serif", 13, QFont::DemiBold));
+    paint.drawText(QRect(67, 96, 600, 30), Qt::AlignLeft | Qt::AlignVCenter,
+                   tr("V4  |  BLUE & WHITE WALLET"));
 
-    const QSize requiredSize(1024,1024);
-    QPixmap icon(networkStyle->getAppIcon().pixmap(requiredSize));
-
-    pixPaint.drawPixmap(rectIcon, icon);
-
-    // check font size and drawing with
-    pixPaint.setFont(QFont(font, 33*fontFactor));
-    QFontMetrics fm = pixPaint.fontMetrics();
-    int titleTextWidth = fm.width(titleText);
-    if (titleTextWidth > 176) {
-        fontFactor = fontFactor * 176 / titleTextWidth;
+    const QString extra = networkStyle->getTitleAddText();
+    if (!extra.isEmpty()) {
+        paint.setPen(QColor("#C14E71"));
+        paint.setFont(QFont("Sans Serif", 12, QFont::Bold));
+        paint.drawText(QRect(714, 58, 204, 28), Qt::AlignRight | Qt::AlignVCenter, extra);
     }
 
-    pixPaint.setFont(QFont(font, 33*fontFactor));
-    fm = pixPaint.fontMetrics();
-    titleTextWidth  = fm.width(titleText);
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop,titleText);
-
-    pixPaint.setFont(QFont(font, 15*fontFactor));
-
-    // if the version string is to long, reduce size
-    fm = pixPaint.fontMetrics();
-    int versionTextWidth  = fm.width(versionText);
-    if(versionTextWidth > titleTextWidth+paddingRight-10) {
-        pixPaint.setFont(QFont(font, 10*fontFactor));
-        titleVersionVSpace -= 5;
+    // Shared Floofy-group artwork also used by the tray / app badge.
+    const QRect imagePanel(61, 153, 389, 332);
+    paint.setBrush(QColor("#E7F7FF"));
+    paint.setPen(QPen(QColor("#B7DEF5"), 1));
+    paint.drawRoundedRect(imagePanel, 16, 16);
+    QPixmap group(":/floofy-v4-group/group");
+    if (!group.isNull()) {
+        const QPixmap scaled = group.scaled(QSize(367, 319),
+                                             Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation);
+        paint.drawPixmap(61 + (389 - scaled.width()) / 2,
+                         155 + (330 - scaled.height()) / 2, scaled);
     }
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight+2,paddingTop+titleVersionVSpace,versionText);
+    paint.setPen(QColor("#356D95"));
+    paint.setFont(QFont("Sans Serif", 10));
+    paint.drawText(QRect(67, 484, 378, 25), Qt::AlignCenter | Qt::AlignVCenter,
+                   tr("Welcome, Floofonaut!"));
 
-    // draw copyright stuff
-    {
-        pixPaint.setFont(QFont(font, 10*fontFactor));
-        const int x = pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight;
-        const int y = paddingTop+titleCopyrightVSpace;
-        QRect copyrightRect(x, y, pixmap.width() - x - paddingRight, pixmap.height() - y);
-        pixPaint.drawText(copyrightRect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
+    // Real user-supplied donation addresses; no private keys or wallet data.
+    const QRect donationCard(471, 153, 446, 349);
+    paint.setBrush(QColor("#F6FBFF"));
+    paint.setPen(QPen(QColor("#BBDFF5"), 1));
+    paint.drawRoundedRect(donationCard, 16, 16);
+    paint.setPen(QColor("#17547F"));
+    paint.setFont(QFont("Sans Serif", 15, QFont::Bold));
+    paint.drawText(QRect(493, 173, 397, 33), Qt::AlignLeft | Qt::AlignVCenter,
+                   tr("Support FloofyChain"));
+    paint.setFont(QFont("Sans Serif", 10));
+    paint.setPen(QColor("#54758C"));
+    paint.drawText(QRect(492, 209, 399, 44),
+                   Qt::AlignLeft | Qt::TextWordWrap,
+                   tr("Donations help with wallet development and network infrastructure."));
+
+    struct DonationRow { const char* coin; const char* address; };
+    const DonationRow addresses[] = {
+        {"DOGE", "DGpnrvtjnhaF866XKbVUpVAJsBJDKZdr6c"},
+        {"LTC", "MCREWjsAVoNzzRAijPWfgRT26LniSBaLH1"},
+        {"FLOOF", "FBgtAgpr7LsChn3dggAKSUrNiJhdRHSHAB"},
+        {"BTC", "3GUraGiEyvgX58cU45qRme6fdYNPM5vN5i"},
+        {"ETH", "0x70Ad65A242CB24cB648A7f81024EC0dA9db61024"}
+    };
+    for (int i = 0; i < 5; ++i) {
+        const int y = 269 + i * 39;
+        paint.setPen(QColor("#0A71B8"));
+        paint.setFont(QFont("Sans Serif", 10, QFont::Bold));
+        paint.drawText(QRect(494, y, 65, 22), Qt::AlignVCenter | Qt::AlignLeft,
+                       QString::fromLatin1(addresses[i].coin));
+        paint.setPen(QColor("#183F60"));
+        paint.setFont(QFont("Monospace", 8));
+        paint.drawText(QRect(557, y, 347, 22), Qt::AlignVCenter | Qt::AlignLeft,
+                       QString::fromLatin1(addresses[i].address));
     }
+    paint.setPen(QColor("#547A96"));
+    paint.setFont(QFont("Sans Serif", 9));
+    paint.drawText(QRect(497, 470, 396, 20), Qt::AlignRight | Qt::AlignVCenter,
+                   QString("Version %1").arg(QString::fromStdString(FormatFullVersion())));
 
-    // draw additional text if special network
-    if(!titleAddText.isEmpty()) {
-        QFont boldFont = QFont(font, 10*fontFactor);
-        boldFont.setWeight(QFont::Bold);
-        pixPaint.setFont(boldFont);
-        fm = pixPaint.fontMetrics();
-        int titleAddTextWidth  = fm.width(titleAddText);
-        pixPaint.drawText(pixmap.width()/devicePixelRatio-titleAddTextWidth-10,15,titleAddText);
-    }
+    // Keep the genuine startup message (including progress) visible at all times.
+    paint.fillRect(QRect(0, 543, 980, 47), QColor("#17649F"));
+    paint.end();
 
-    pixPaint.end();
-
-    // Set window title
-    setWindowTitle(titleText + " " + titleAddText);
-
-    // Resize window and move to center of desktop, disallow resizing
-    QRect r(QPoint(), QSize(pixmap.size().width()/devicePixelRatio,pixmap.size().height()/devicePixelRatio));
-    resize(r.size());
-    setFixedSize(r.size());
-    move(QApplication::desktop()->screenGeometry().center() - r.center());
-
+    setWindowTitle(tr(PACKAGE_NAME) + " " + extra);
+    resize(logicalSize);
+    setFixedSize(logicalSize);
+    move(QApplication::desktop()->screenGeometry().center() - rect().center());
     subscribeToCoreSignals();
 }
 
@@ -217,11 +233,18 @@ void SplashScreen::showMessage(const QString &message, int alignment, const QCol
 
 void SplashScreen::paintEvent(QPaintEvent *event)
 {
+    // FLOOFY_V4_GROUP_ART_PATCH_2026: display real wallet/core startup messages.
+    Q_UNUSED(event);
     QPainter painter(this);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
     painter.drawPixmap(0, 0, pixmap);
-    QRect r = rect().adjusted(5, 5, -5, -5);
-    painter.setPen(curColor);
-    painter.drawText(r, curAlignment, curMessage);
+    painter.setPen(Qt::white);
+    painter.setFont(QFont("Sans Serif", 11, QFont::DemiBold));
+    const QString status = curMessage.isEmpty()
+        ? tr("Starting FloofyChain...") : curMessage;
+    painter.drawText(QRect(25, 548, width() - 50, 35),
+                     Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextSingleLine,
+                     status);
 }
 
 void SplashScreen::closeEvent(QCloseEvent *event)

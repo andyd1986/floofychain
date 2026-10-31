@@ -110,4 +110,25 @@
         <file alias="NotoSans-Medium">res/fonts/NotoSans-Medium.ttf</file>
         <file alias="NotoSans-Regular">res/fonts/NotoSans-Regular.ttf</file>
     </qresource>
+    <!-- FLOOFY_V4_BLUE_ART_PACK: independent Qt-only graphics -->
+    <qresource prefix="/floofy-v4">
+        <file alias="mascot-blue">res/floofy-v4-art/mascot-blue.png</file>
+        <file alias="mascot-monocle">res/floofy-v4-art/mascot-monocle.png</file>
+        <file alias="floofy-friends">res/floofy-v4-art/floofy-friends.png</file>
+        <file alias="cloud-islands">res/floofy-v4-art/cloud-islands.png</file>
+        <file alias="flaffy">res/floofy-v4-art/flaffy.png</file>
+        <file alias="flanama">res/floofy-v4-art/flanama.png</file>
+        <file alias="flanttos">res/floofy-v4-art/flanttos.png</file>
+        <file alias="floofy">res/floofy-v4-art/floofy.png</file>
+        <file alias="flennox">res/floofy-v4-art/flennox.png</file>
+        <file alias="flonomina">res/floofy-v4-art/flonomina.png</file>
+        <file alias="fluggex">res/floofy-v4-art/fluggex.png</file>
+        <file alias="flynnix">res/floofy-v4-art/flynnix.png</file>
+        <file alias="flyonni">res/floofy-v4-art/flyonni.png</file>
+    </qresource>
+    <!-- FLOOFY_V4_GROUP_ART_PATCH_2026: Qt-only artwork -->
+    <qresource prefix="/floofy-v4-group">
+        <file alias="group">res/floofy-v4-group/floofy-group.png</file>
+        <file alias="tray-icon">res/floofy-v4-group/floofy-tray.png</file>
+    </qresource>
 </RCC>

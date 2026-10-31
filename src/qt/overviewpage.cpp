@@ -29,6 +29,7 @@
 
 #include <QAbstractItemDelegate>
 #include <QPainter>
+#include <QPixmap>
 #include <QDateTime>
 #include <QFrame>
 #include <QGridLayout>
@@ -493,6 +494,31 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     dashboardHint->setObjectName("floofyOverviewSubtitle");
     dashboardHeading->addWidget(dashboardHint);
     dashboardLayout->addLayout(dashboardHeading);
+
+    // FLOOFY_V4_BLUE_ART_PACK: welcoming, compact visual hero.
+    QFrame* floofyV4Hero = new QFrame(dashboard);
+    floofyV4Hero->setObjectName("floofyV4WelcomeCard");
+    QHBoxLayout* floofyV4HeroRow = new QHBoxLayout(floofyV4Hero);
+    floofyV4HeroRow->setContentsMargins(14, 7, 14, 7);
+    floofyV4HeroRow->setSpacing(16);
+    QVBoxLayout* floofyV4HeroText = new QVBoxLayout();
+    floofyV4HeroText->setSpacing(4);
+    QLabel* floofyV4HeroTitle = new QLabel(tr("Welcome, Floofonaut!"), floofyV4Hero);
+    floofyV4HeroTitle->setObjectName("floofyV4WelcomeTitle");
+    QLabel* floofyV4HeroCaption = new QLabel(
+        tr("FloofyChain V4  |  Native PoW + AuxPoW  |  Shared ASERT"), floofyV4Hero);
+    floofyV4HeroCaption->setObjectName("floofyV4WelcomeCaption");
+    floofyV4HeroCaption->setWordWrap(true);
+    floofyV4HeroText->addWidget(floofyV4HeroTitle);
+    floofyV4HeroText->addWidget(floofyV4HeroCaption);
+    floofyV4HeroRow->addLayout(floofyV4HeroText, 1);
+    QLabel* floofyV4HeroArt = new QLabel(floofyV4Hero);
+    floofyV4HeroArt->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    floofyV4HeroArt->setPixmap(QPixmap(":/floofy-v4/floofy-friends").scaled(
+        285, 110, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    floofyV4HeroArt->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    floofyV4HeroRow->addWidget(floofyV4HeroArt);
+    dashboardLayout->addWidget(floofyV4Hero);
 
     // Preserve existing alert behaviour while keeping warnings in the
     // same visual section as the information they describe.

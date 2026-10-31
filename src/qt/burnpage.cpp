@@ -18,6 +18,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPixmap>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
@@ -129,6 +130,25 @@ BurnPage::BurnPage(QWidget* parent)
     QLabel* heading = new QLabel(tr("🔥 Burn FLOOF"), this);
     heading->setObjectName("burnPageHeading");
     main->addWidget(heading);
+
+    // FLOOFY_V4_BLUE_ART_PACK: compact original-art header, no burn-logic edits.
+    QHBoxLayout* floofyV4BurnRow = new QHBoxLayout();
+    QLabel* floofyV4BurnMascot = new QLabel(this);
+    floofyV4BurnMascot->setPixmap(QPixmap(":/floofy-v4/flennox").scaled(
+        58, 58, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    floofyV4BurnMascot->setAlignment(Qt::AlignCenter);
+    floofyV4BurnRow->addWidget(floofyV4BurnMascot);
+    QVBoxLayout* floofyV4BurnText = new QVBoxLayout();
+    floofyV4BurnText->setSpacing(2);
+    QLabel* floofyV4BurnTitle = new QLabel(tr("Burn FLOOF"), this);
+    floofyV4BurnTitle->setObjectName("floofyV4PageTitle");
+    QLabel* floofyV4BurnSubtitle = new QLabel(tr("Voluntary, permanent and verifiable"), this);
+    floofyV4BurnSubtitle->setObjectName("floofyV4PageCaption");
+    floofyV4BurnText->addWidget(floofyV4BurnTitle);
+    floofyV4BurnText->addWidget(floofyV4BurnSubtitle);
+    floofyV4BurnRow->addLayout(floofyV4BurnText);
+    floofyV4BurnRow->addStretch();
+    main->addLayout(floofyV4BurnRow);
 
     QLabel* intro = new QLabel(
         tr("Permanently remove FLOOF from circulation using a provably "

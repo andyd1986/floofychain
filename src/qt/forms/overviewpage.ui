@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
+ <!-- FLOOFY_V4_BLUE_ART_PACK: alert colour -->
  <class>OverviewPage</class>
  <widget class="QWidget" name="OverviewPage">
   <property name="geometry">
@@ -35,7 +36,7 @@
       <bool>false</bool>
      </property>
      <property name="styleSheet">
-      <string notr="true">QLabel { background-color: #E5DEFF; color: #35324E; border-radius: 8px; padding: 6px; }</string>
+      <string notr="true">QLabel { background-color: #D9EFFF; color: #183A58; border-radius: 8px; padding: 6px; }</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
