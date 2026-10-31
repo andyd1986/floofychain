@@ -132,4 +132,20 @@ The FloofyChain ecosystem includes a blockchain explorer, Qt wallet, community D
 - Consensus parameters: [`src/chainparams.cpp`](src/chainparams.cpp)
 - Difficulty and balancing: [`src/pow.cpp`](src/pow.cpp)
 - Block validation: [`src/validation.cpp`](src/validation.cpp)
-What a bunch of floof. 🐾 Keep mining,
+What a bunch of floof. 🐾 Keep mining
+
+## ❤️ Support FloofyChain
+
+If you would like to support FloofyChain development, infrastructure and future releases, you can donate using any of the addresses below:
+
+> **DOGE**  `DGpnrvtjnhaF866XKbVUpVAJsBJDKZdr6c`
+>
+> **LTC**   `MCREWjsAVoNzzRAijPWfgRT26LniSBaLH1`
+>
+> **FLOOF** `FBgtAgpr7LsChn3dggAKSUrNiJhdRHSHAB`
+>
+> **BTC**   `3GUraGiEyvgX58cU45qRme6fdYNPM5vN5i`
+>
+> **ETH**   `0x70Ad65A242CB24cB648A7f81024EC0dA9db61024`
+
+Every donation helps support FloofyChain development, wallet improvements, infrastructure and ongoing community tools. Thank you for supporting the project! 🐾
